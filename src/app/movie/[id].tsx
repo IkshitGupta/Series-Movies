@@ -1,0 +1,173 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { useEffect } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+
+import { useMovie } from '@/api/queries';
+import { EmptyState } from '@/components/EmptyState';
+import { PosterImage } from '@/components/PosterImage';
+import { WatchlistButton } from '@/components/WatchlistButton';
+import { movieToMediaItem } from '@/lib/normalize';
+import { profileUrl } from '@/lib/tmdbImage';
+import { useIsMovieWatched, useLibraryStore } from '@/store/useLibraryStore';
+
+function formatRuntime(min: number | null): string | null {
+  if (!min) return null;
+  const hours = Math.floor(min / 60);
+  const mins = min % 60;
+  return hours ? `${hours}h ${mins}m` : `${mins}m`;
+}
+
+export default function MovieDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const movieId = Number(id);
+
+  const { data: movie, isLoading, isError, error } = useMovie(movieId);
+  const watched = useIsMovieWatched(movieId);
+  const markWatched = useLibraryStore((s) => s.markMovieWatched);
+  const unmark = useLibraryStore((s) => s.unmarkMovieWatched);
+  const setMovieRuntime = useLibraryStore((s) => s.setMovieRuntime);
+
+  // Record the runtime once the movie is watched (used for total-time stats).
+  useEffect(() => {
+    if (watched && movie?.runtime) setMovieRuntime(movieId, movie.runtime);
+  }, [watched, movie?.runtime, movieId, setMovieRuntime]);
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-neutral-50 dark:bg-black">
+        <Stack.Screen options={{ title: 'Movie' }} />
+        <ActivityIndicator color="#E50914" />
+      </View>
+    );
+  }
+
+  if (isError || !movie) {
+    return (
+      <View className="flex-1 bg-neutral-50 dark:bg-black">
+        <Stack.Screen options={{ title: 'Movie' }} />
+        <EmptyState
+          icon="alert-circle-outline"
+          title="Couldn’t load this movie"
+          message={error instanceof Error ? error.message : 'Please try again later.'}
+        />
+      </View>
+    );
+  }
+
+  const item = movieToMediaItem(movie);
+  const runtime = formatRuntime(movie.runtime);
+  const cast = movie.credits?.cast?.slice(0, 12) ?? [];
+
+  return (
+    <>
+      <Stack.Screen options={{ title: movie.title }} />
+      <ScrollView
+        className="flex-1 bg-neutral-50 dark:bg-black"
+        contentContainerStyle={{ paddingBottom: 40 }}>
+        <View className="flex-row gap-4 p-4">
+          <PosterImage path={movie.poster_path} size="w342" className="h-48 w-32 rounded-2xl" />
+          <View className="flex-1 gap-2">
+            <Text className="text-xl font-bold text-neutral-900 dark:text-neutral-50">
+              {movie.title}
+            </Text>
+            <Text className="text-sm text-neutral-500 dark:text-neutral-400">
+              {[item.year, runtime].filter(Boolean).join('  •  ')}
+            </Text>
+            {movie.vote_average ? (
+              <View className="flex-row items-center gap-1">
+                <Ionicons name="star" size={14} color="#f5c518" />
+                <Text className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
+                  {movie.vote_average.toFixed(1)}
+                </Text>
+              </View>
+            ) : null}
+            <View className="flex-row flex-wrap gap-1">
+              {movie.genres.map((g) => (
+                <View
+                  key={g.id}
+                  className="rounded-full bg-neutral-200 px-2 py-0.5 dark:bg-neutral-800">
+                  <Text className="text-[11px] text-neutral-600 dark:text-neutral-300">{g.name}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        <View className="flex-row items-center gap-3 px-4">
+          <Pressable
+            onPress={() => (watched ? unmark(movieId) : markWatched(item))}
+            className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl py-3 active:opacity-80"
+            style={{ backgroundColor: watched ? '#16a34a' : '#E50914' }}>
+            <Ionicons
+              name={watched ? 'checkmark-circle' : 'add-circle-outline'}
+              size={20}
+              color="white"
+            />
+            <Text className="text-base font-semibold text-white">
+              {watched ? 'Watched' : 'Mark watched'}
+            </Text>
+          </Pressable>
+          {!watched ? (
+            <View className="rounded-2xl bg-neutral-200 dark:bg-neutral-800">
+              <WatchlistButton item={item} />
+            </View>
+          ) : null}
+        </View>
+
+        {movie.overview ? (
+          <View className="gap-1 p-4">
+            <Text className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
+              Overview
+            </Text>
+            <Text className="text-sm leading-5 text-neutral-600 dark:text-neutral-300">
+              {movie.overview}
+            </Text>
+          </View>
+        ) : null}
+
+        {cast.length > 0 ? (
+          <View className="gap-2 pb-2">
+            <Text className="px-4 text-base font-semibold text-neutral-900 dark:text-neutral-50">
+              Top cast
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+              {cast.map((person) => {
+                const url = profileUrl(person.profile_path);
+                return (
+                  <View key={person.id} className="w-20 items-center gap-1">
+                    <View className="h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+                      {url ? (
+                        <Image
+                          source={{ uri: url }}
+                          contentFit="cover"
+                          style={{ width: '100%', height: '100%' }}
+                        />
+                      ) : (
+                        <Ionicons name="person" size={24} color="#9ca3af" />
+                      )}
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      className="text-center text-[11px] font-medium text-neutral-700 dark:text-neutral-200">
+                      {person.name}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      className="text-center text-[10px] text-neutral-500 dark:text-neutral-400">
+                      {person.character}
+                    </Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
+      </ScrollView>
+    </>
+  );
+}

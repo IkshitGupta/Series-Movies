@@ -10,12 +10,13 @@ Built as a modern, cross-platform (iOS + Android) React Native app.
 
 - 🔎 **Search** movies & TV shows via TMDB (posters, ratings, cast, genres).
 - ✅ **Mark movies watched** with a single tap.
-- 📺 **Per-episode TV tracking** — tick individual episodes, "mark all" a season, mark the **whole series** watched, or tap **↑ to mark everything up to an episode** (including previous seasons). Live progress bar.
+- 📺 **Per-episode TV tracking** — tick individual episodes, "mark all" a season, mark the **whole series** watched, or tap **↑ to mark everything up to an episode** (including previous seasons). Live progress bar. In the **Watching** and **Continue later** lists, a **Next** button marks the next unwatched episode in one tap (and resumes a paused show).
 - 🔖 **"To Watch" watchlist** split into **Movies** and **TV Series** tabs. Items already watched or categorized no longer offer a "to watch" option.
 - 🏷️ **TV show status** — *Watching* and *Completed* are auto-derived from episode progress; for a show you're still watching you can manually mark it **Stopped watching** or **Continue later** (these options are hidden once a show is completed). Manual flags don't affect stats and auto-clear the moment you watch another episode.
 - 🗂️ **Separate Movies and Series tabs** — watched movies in one tab; series split into **4 views** with counts: *Watching · Completed · Stopped watching · Continue later*.
 - 📊 **Stats** — totals, **total watch time**, and a per-genre breakdown, tracked separately for movies and TV shows. Tap any genre to see the titles in it.
 - 🎭 **Genres** shown on both movie and TV detail screens.
+- 📥 **Import from TV Time** — on first launch (or later from the Series tab) you can bring in your **TV Time data export** (a `.zip` of JSON files). It imports your watched **movies and TV episodes**, maps each title to TMDB, mirrors your per-show status (*stopped* → Stopped watching, *watch later* → Continue later), adds not-yet-started titles to your **watchlist**, and lists anything it couldn't match with a downloadable **CSV report**.
 - 🌓 **Dark mode** that follows your system theme.
 - 💾 **Offline-first** — your data lives on the device via MMKV. No sign-in.
 
@@ -132,6 +133,8 @@ src/
       stats.tsx            # totals + genre breakdown
     movie/[id].tsx         # movie detail + watched toggle
     show/[id].tsx          # show detail + per-episode tracking
+    onboarding.tsx         # first-launch welcome (import or start fresh)
+    import.tsx             # TV Time import flow (pick ZIP → resolve → report)
   api/
     tmdb.ts                # typed fetch client
     queries.ts             # TanStack Query hooks
@@ -140,6 +143,7 @@ src/
     storage.ts             # MMKV adapter for Zustand persist
   components/              # PosterImage, MediaCard, EpisodeRow, etc. (NativeWind)
   lib/                     # image URLs, normalization, hooks
+    tvtimeImport.ts        # TV Time export: unzip + parse + TMDB resolve + report
   types/                   # domain + TMDB types
 ```
 
@@ -175,6 +179,14 @@ src/
   values are kept in `style`.
 - **React Compiler** (`experiments.reactCompiler`) is disabled — it's still experimental and
   altered render behavior during development.
+- **TV Time import** uses [`fflate`](https://github.com/101arrowz/fflate) (pure-JS unzip) plus
+  `expo-document-picker` / `expo-file-system` / `expo-sharing`. It parses the export's
+  `tvtime-movies-*.json` and `tvtime-series-*.json`, resolves movies to TMDB by **IMDb id**
+  (`GET /find/{id}?external_source=imdb_id`) and shows by **TheTVDB id**
+  (`?external_source=tvdb_id`), and merges the result into the library. The JSON export carries no
+  runtimes, so watch-time comes from TMDB (`/movie.runtime`, `/tv.episode_run_time`, with a
+  season-average fallback). Titles without a confident TMDB match are surfaced and exported as a CSV
+  report.
 
 ---
 
