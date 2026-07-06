@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { memo } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { stillUrl } from '@/lib/tmdbImage';
@@ -10,13 +11,13 @@ interface EpisodeRowProps {
   subtitle?: string;
   stillPath?: string | null;
   watched: boolean;
-  onToggle: () => void;
+  onToggle: (episodeNumber: number) => void;
   /** Mark this episode and every earlier one (incl. previous seasons) as watched. */
-  onWatchTillHere?: () => void;
+  onWatchTillHere?: (episodeNumber: number) => void;
   busy?: boolean;
 }
 
-export function EpisodeRow({
+export const EpisodeRow = memo(function EpisodeRow({
   episodeNumber,
   title,
   subtitle,
@@ -31,13 +32,14 @@ export function EpisodeRow({
   return (
     <View className="flex-row items-center gap-2 py-2">
       <Pressable
-        onPress={onToggle}
+        onPress={() => onToggle(episodeNumber)}
         className="flex-1 flex-row items-center gap-3 active:opacity-70">
         <View className="h-12 w-20 items-center justify-center overflow-hidden rounded-lg bg-neutral-200 dark:bg-neutral-800">
           {still ? (
             <Image
               source={{ uri: still }}
               contentFit="cover"
+              recyclingKey={still}
               style={{ width: '100%', height: '100%' }}
             />
           ) : (
@@ -61,7 +63,7 @@ export function EpisodeRow({
 
       {onWatchTillHere ? (
         <Pressable
-          onPress={onWatchTillHere}
+          onPress={() => onWatchTillHere(episodeNumber)}
           disabled={busy}
           hitSlop={8}
           accessibilityRole="button"
@@ -75,7 +77,7 @@ export function EpisodeRow({
         </Pressable>
       ) : null}
 
-      <Pressable onPress={onToggle} hitSlop={6} className="active:opacity-60">
+      <Pressable onPress={() => onToggle(episodeNumber)} hitSlop={6} className="active:opacity-60">
         <Ionicons
           name={watched ? 'checkmark-circle' : 'ellipse-outline'}
           size={26}
@@ -84,4 +86,4 @@ export function EpisodeRow({
       </Pressable>
     </View>
   );
-}
+});

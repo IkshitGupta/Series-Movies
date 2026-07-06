@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { queryKeys, useSeason, useShow } from '@/api/queries';
@@ -46,6 +46,22 @@ function SeasonEpisodes({
   const watchedSet = useMemo(
     () => new Set(tracked?.watchedEpisodes ?? []),
     [tracked?.watchedEpisodes],
+  );
+
+  // Stable per-row handlers so memoized EpisodeRows only re-render when their
+  // own `watched`/`busy` changes — toggling one episode no longer re-renders
+  // the whole season. EpisodeRow passes back the episode number.
+  const handleToggle = useCallback(
+    (episode: number) => toggleEpisode(item, totalEpisodes, seasonNumber, episode),
+    [toggleEpisode, item, totalEpisodes, seasonNumber],
+  );
+  const tillRef = useRef(onWatchTillHere);
+  useEffect(() => {
+    tillRef.current = onWatchTillHere;
+  }, [onWatchTillHere]);
+  const handleTill = useCallback(
+    (episode: number) => tillRef.current(seasonNumber, episode),
+    [seasonNumber],
   );
 
   // Once the show is tracked, record the average episode runtime (from the
@@ -115,8 +131,8 @@ function SeasonEpisodes({
           subtitle={ep.air_date ?? undefined}
           stillPath={ep.still_path}
           watched={watchedSet.has(episodeKey(seasonNumber, ep.episode_number))}
-          onToggle={() => toggleEpisode(item, totalEpisodes, seasonNumber, ep.episode_number)}
-          onWatchTillHere={() => onWatchTillHere(seasonNumber, ep.episode_number)}
+          onToggle={handleToggle}
+          onWatchTillHere={handleTill}
           busy={busy === episodeKey(seasonNumber, ep.episode_number)}
         />
       ))}
@@ -135,6 +151,9 @@ export default function ShowDetailScreen() {
   const markEpisodesWatched = useLibraryStore((s) => s.markEpisodesWatched);
   const setShowStatus = useLibraryStore((s) => s.setShowStatus);
   const [busy, setBusy] = useState<string | null>(null);
+  // Memoized so the derived MediaItem keeps a stable identity across renders,
+  // which keeps SeasonEpisodes' per-row callbacks (and their memoized rows) stable.
+  const memoItem = useMemo(() => (show ? tvToMediaItem(show) : null), [show]);
 
   if (isLoading) {
     return (
@@ -158,7 +177,8 @@ export default function ShowDetailScreen() {
     );
   }
 
-  const item = tvToMediaItem(show);
+  if (!memoItem) return null;
+  const item = memoItem;
   const total = show.number_of_episodes;
   const seasons = show.seasons.filter((s) => s.season_number >= 1 && s.episode_count > 0);
   const activeSeason = selectedSeason ?? seasons[0]?.season_number ?? 1;

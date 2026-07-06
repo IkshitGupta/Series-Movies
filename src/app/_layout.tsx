@@ -5,20 +5,29 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'nativewind';
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { flushQueryCache, hydrateQueryCache, startQueryCachePersistence } from '@/store/queryPersist';
+import { flushPendingWrites, trimStorage } from '@/store/storage';
 import { useLibraryStore } from '@/store/useLibraryStore';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5,
-      gcTime: 1000 * 60 * 30,
+      // Keep fetched data in memory for a day so navigating back to a detail
+      // (or re-opening it) serves from cache instead of re-hitting TMDB.
+      gcTime: 1000 * 60 * 60 * 24,
       retry: 1,
       refetchOnWindowFocus: false,
     },
   },
 });
+
+// Restore the persisted TMDB cache before anything subscribes, so previously
+// opened detail renders instantly (and offline) on a cold start.
+hydrateQueryCache(queryClient);
 
 export default function RootLayout() {
   const { colorScheme, setColorScheme } = useColorScheme();
@@ -29,6 +38,24 @@ export default function RootLayout() {
   useEffect(() => {
     setColorScheme(theme);
   }, [theme, setColorScheme]);
+
+  // Storage housekeeping: reclaim MMKV's file space once after hydration, and
+  // flush any coalesced write when the app is backgrounded so nothing is lost.
+  useEffect(() => {
+    const trimTimer = setTimeout(trimStorage, 1000);
+    const stopQueryPersist = startQueryCachePersistence(queryClient);
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'background' || next === 'inactive') {
+        flushPendingWrites();
+        flushQueryCache();
+      }
+    });
+    return () => {
+      clearTimeout(trimTimer);
+      stopQueryPersist();
+      sub.remove();
+    };
+  }, []);
 
   const isDark = colorScheme === 'dark';
 

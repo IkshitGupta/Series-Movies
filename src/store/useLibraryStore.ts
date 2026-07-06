@@ -328,6 +328,15 @@ export const useLibraryStore = create<LibraryState>()(
       name: 'library-store',
       storage: createJSONStorage(() => zustandStorage),
       version: 4,
+      // Only persist data fields (actions are functions and never serialize
+      // anyway); being explicit keeps future ephemeral state out of storage.
+      partialize: (state) => ({
+        watchlist: state.watchlist,
+        watchedMovies: state.watchedMovies,
+        trackedShows: state.trackedShows,
+        onboarded: state.onboarded,
+        theme: state.theme,
+      }),
       // v2 narrowed ShowUserStatus; v3 also drops "dangling" shows that ended
       // up with no episode progress and no manual status; v4 adds `onboarded`
       // (existing users already have a library, so they skip onboarding).

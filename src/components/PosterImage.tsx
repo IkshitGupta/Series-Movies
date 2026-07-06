@@ -10,7 +10,7 @@ interface PosterImageProps {
   className?: string;
 }
 
-const BLURHASH = 'L6PZfSi_.AyE_3t7t7R**0o#DgR4';
+const BLURHASH_PLACEHOLDER = { blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' };
 
 /**
  * Renders a TMDB poster with a graceful fallback when no image is available.
@@ -24,7 +24,8 @@ export function PosterImage({ path, size = 'w342', className }: PosterImageProps
       {uri ? (
         <Image
           source={{ uri }}
-          placeholder={{ blurhash: BLURHASH }}
+          placeholder={BLURHASH_PLACEHOLDER}
+          recyclingKey={uri}
           contentFit="cover"
           transition={200}
           style={{ width: '100%', height: '100%' }}

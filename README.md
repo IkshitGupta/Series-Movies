@@ -237,6 +237,24 @@ src/
   screen's title, and since `(tabs)` has `headerShown:false`/no title it leaked the raw route name
   "(tabs)". The root `Stack` sets `headerBackButtonDisplayMode: 'minimal'` (chevron only) to avoid this.
   (Android hides back-button labels, so this only reproduces on iOS.)
+- **Storage efficiency.** The whole library persists as one JSON blob under a single MMKV key, so every
+  mutation rewrites it. To keep MMKV's append log (and file) from bloating, `store/persistDebounce.ts`
+  coalesces rapid successive writes into one, `_layout.tsx` flushes any pending write on app background
+  (durability) and calls `storage.trim()` once on startup to reclaim space — MMKV grows its file by
+  doubling and never shrinks it on its own. The persist config also uses `partialize` to whitelist the
+  data fields. (Measured: a ~117 KB library that had inflated the MMKV file to 2 MB compacts to ~128 KB.)
+- **TMDB caching.** Movie/show/season detail is effectively immutable, so those queries use a 24 h
+  `staleTime` and the client keeps data for a 24 h `gcTime` — navigating back to a detail serves from
+  cache instead of re-hitting TMDB (search stays short-lived). `store/queryPersist.ts` then persists the
+  React Query cache to MMKV across restarts (dependency-free, via core `dehydrate`/`hydrate`): only
+  successful `movie`/`tv`/season queries are saved (volatile `search` is excluded), guarded by a version
+  tag + 7-day max-age. Result: previously opened titles open instantly and **work fully offline** after a
+  cold start, cutting redundant API calls.
+- **Render performance.** All large lists use `FlatList` (virtualized) with memoized/sorted data.
+  `EpisodeRow` is wrapped in `React.memo` with stable per-row callbacks (a `useCallback` for toggling and
+  a latest-ref for "mark till here", plus a memoized `MediaItem`), so toggling one episode re-renders only
+  that row instead of the whole season. `PosterImage` uses a hoisted placeholder object and a
+  `recyclingKey` so FlatList image recycling is correct and allocation-free while scrolling.
 
 ---
 
