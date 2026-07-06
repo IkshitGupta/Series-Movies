@@ -35,6 +35,9 @@ export interface TrackedShow extends MediaItem {
   watchedEpisodes: string[];
   totalEpisodes: number;
   lastUpdated: number;
+  /** Episodes released so far (from TMDB), used for progress so unaired future
+   * episodes aren't counted as "remaining". Falls back to totalEpisodes. */
+  airedEpisodes?: number;
   /** Manual watch state chosen by the user; does not affect stats. */
   userStatus?: ShowUserStatus;
   /** Typical episode runtime in minutes (from TMDB), for total watch-time stats. */
@@ -119,6 +122,16 @@ export interface TmdbSeasonSummary {
   air_date: string | null;
 }
 
+/** The next unaired episode TMDB knows about (from `/tv/{id}.next_episode_to_air`). */
+export interface TmdbNextEpisode {
+  air_date: string | null;
+  episode_number: number;
+  season_number: number;
+  /** e.g. "premiere" | "standard" | "mid_season" | "finale". */
+  episode_type?: string;
+  name: string;
+}
+
 export interface TmdbTvDetails {
   id: number;
   name: string;
@@ -133,6 +146,12 @@ export interface TmdbTvDetails {
   genres: TmdbGenre[];
   seasons: TmdbSeasonSummary[];
   credits?: { cast: TmdbCastMember[] };
+  /** Lifecycle, e.g. "Returning Series" | "Ended" | "Canceled" | "In Production". */
+  status: string;
+  in_production: boolean;
+  next_episode_to_air: TmdbNextEpisode | null;
+  /** The most recent episode that has already aired (null if none yet). */
+  last_episode_to_air: TmdbNextEpisode | null;
 }
 
 export interface TmdbEpisode {

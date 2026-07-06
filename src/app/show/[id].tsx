@@ -11,6 +11,7 @@ import { EpisodeRow } from '@/components/EpisodeRow';
 import { PosterImage } from '@/components/PosterImage';
 import { ProgressBar } from '@/components/ProgressBar';
 import { WatchlistButton } from '@/components/WatchlistButton';
+import { getUpcoming, airedEpisodeCount, upcomingLabel } from '@/lib/airing';
 import { tvToMediaItem } from '@/lib/normalize';
 import {
   getShowStatus,
@@ -150,10 +151,22 @@ export default function ShowDetailScreen() {
   const queryClient = useQueryClient();
   const markEpisodesWatched = useLibraryStore((s) => s.markEpisodesWatched);
   const setShowStatus = useLibraryStore((s) => s.setShowStatus);
+  const syncShowMeta = useLibraryStore((s) => s.syncShowMeta);
   const [busy, setBusy] = useState<string | null>(null);
   // Memoized so the derived MediaItem keeps a stable identity across renders,
   // which keeps SeasonEpisodes' per-row callbacks (and their memoized rows) stable.
   const memoItem = useMemo(() => (show ? tvToMediaItem(show) : null), [show]);
+
+  // Keep episode totals in sync with TMDB: totalEpisodes (incl. announced) so a
+  // new season flips a completed show back to watching, and airedEpisodes so
+  // progress ignores unaired future episodes.
+  useEffect(() => {
+    if (!tracked || !show) return;
+    syncShowMeta(showId, {
+      totalEpisodes: show.number_of_episodes,
+      airedEpisodes: airedEpisodeCount(show) ?? undefined,
+    });
+  }, [tracked, show, showId, syncShowMeta]);
 
   if (isLoading) {
     return (
@@ -180,15 +193,18 @@ export default function ShowDetailScreen() {
   if (!memoItem) return null;
   const item = memoItem;
   const total = show.number_of_episodes;
+  // Episodes released so far — the denominator for progress (excludes unaired).
+  const airedTotal = airedEpisodeCount(show) ?? total;
   const seasons = show.seasons.filter((s) => s.season_number >= 1 && s.episode_count > 0);
   const activeSeason = selectedSeason ?? seasons[0]?.season_number ?? 1;
 
   const watchedCount = tracked?.watchedEpisodes.length ?? 0;
-  // Clamp for display: imported counts can exceed TMDB's total (split episodes).
-  const displayWatched = total > 0 ? Math.min(watchedCount, total) : watchedCount;
-  const progress = total > 0 ? displayWatched / total : 0;
+  // Clamp for display against episodes released so far (excludes unaired future).
+  const displayWatched = airedTotal > 0 ? Math.min(watchedCount, airedTotal) : watchedCount;
+  const progress = airedTotal > 0 ? displayWatched / airedTotal : 0;
   const status = getShowStatus(tracked);
   const userStatus = tracked?.userStatus;
+  const upcoming = getUpcoming(show);
   const effectiveStatusLabel =
     userStatus === 'stopped'
       ? 'Stopped watching'
@@ -296,13 +312,20 @@ export default function ShowDetailScreen() {
           </View>
         </View>
 
+        {upcoming ? (
+          <View className="mx-4 mb-1 flex-row items-center gap-2 rounded-xl bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
+            <Ionicons name="calendar-outline" size={16} color="#E50914" />
+            <Text className="text-sm font-semibold text-brand">{upcomingLabel(upcoming)}</Text>
+          </View>
+        ) : null}
+
         <View className="gap-2 px-4 pb-2">
           <View className="flex-row items-center justify-between">
             <Text className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
               {effectiveStatusLabel}
             </Text>
             <Text className="text-sm text-neutral-500 dark:text-neutral-400">
-              {displayWatched}/{total} episodes
+              {displayWatched}/{airedTotal} episodes
             </Text>
           </View>
           <ProgressBar value={progress} />

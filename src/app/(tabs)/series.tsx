@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { useShow } from '@/api/queries';
 import { EmptyState } from '@/components/EmptyState';
 import { MediaCard } from '@/components/MediaCard';
 import { StatusBadge } from '@/components/StatusBadge';
+import { airedEpisodeCount, getUpcoming, upcomingLabel } from '@/lib/airing';
 import { findNextEpisode } from '@/lib/nextEpisode';
 import { getShowProgress, getShowStatus, useLibraryStore } from '@/store/useLibraryStore';
 import type { MediaItem, ShowStatus, ShowUserStatus, TrackedShow } from '@/types';
@@ -74,6 +76,60 @@ function MarkNextButton({ busy, onPress }: { busy: boolean; onPress: () => void 
         </>
       )}
     </Pressable>
+  );
+}
+
+/**
+ * A single Series row. Reads the show's TMDB detail from the shared (cached +
+ * persisted) query so it can surface a "new season / new episode coming" badge
+ * without extra plumbing; the fetch is deduped with the detail screen.
+ */
+function SeriesRow({
+  item,
+  tvFilter,
+  busy,
+  onOpen,
+  onMarkNext,
+}: {
+  item: TrackedShow;
+  tvFilter: TvFilter;
+  busy: boolean;
+  onOpen: (item: MediaItem) => void;
+  onMarkNext: (show: TrackedShow) => void;
+}) {
+  const { data } = useShow(item.id);
+  const syncShowMeta = useLibraryStore((s) => s.syncShowMeta);
+  // Sync the released-episode count from the fetched detail so the list shows
+  // aired-based progress (e.g. 20/21, not 20/26) without opening each show.
+  // Only airedEpisodes is synced here (display) — grouping stays put.
+  useEffect(() => {
+    if (!data) return;
+    syncShowMeta(item.id, { airedEpisodes: airedEpisodeCount(data) ?? undefined });
+  }, [data, item.id, syncShowMeta]);
+  const { watched, total } = getShowProgress(item);
+  const status = getShowStatus(item);
+  const label = item.userStatus ? USER_STATUS_LABEL[item.userStatus] : STATUS_LABEL[status];
+  const tone = item.userStatus
+    ? USER_STATUS_TONE[item.userStatus]
+    : status === 'completed'
+      ? 'success'
+      : 'brand';
+  const canMarkNext = tvFilter === 'watching' || tvFilter === 'continue_later';
+  const upcoming = getUpcoming(data);
+  return (
+    <MediaCard
+      item={item}
+      onPress={() => onOpen(item)}
+      subtitle={`${watched}${total ? `/${total}` : ''} episodes watched`}
+      badge={upcoming ? upcomingLabel(upcoming) : undefined}
+      right={
+        canMarkNext ? (
+          <MarkNextButton busy={busy} onPress={() => onMarkNext(item)} />
+        ) : (
+          <StatusBadge label={label} tone={tone} />
+        )
+      }
+    />
   );
 }
 
@@ -165,33 +221,15 @@ export default function SeriesScreen() {
           data={tvGroups[tvFilter]}
           keyExtractor={(item) => `tv-${item.id}`}
           contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 8, paddingBottom: 32 }}
-          renderItem={({ item }) => {
-            const { watched, total } = getShowProgress(item);
-            const status = getShowStatus(item);
-            const label = item.userStatus
-              ? USER_STATUS_LABEL[item.userStatus]
-              : STATUS_LABEL[status];
-            const tone = item.userStatus
-              ? USER_STATUS_TONE[item.userStatus]
-              : status === 'completed'
-                ? 'success'
-                : 'brand';
-            const canMarkNext = tvFilter === 'watching' || tvFilter === 'continue_later';
-            return (
-              <MediaCard
-                item={item}
-                onPress={() => openItem(item)}
-                subtitle={`${watched}${total ? `/${total}` : ''} episodes watched`}
-                right={
-                  canMarkNext ? (
-                    <MarkNextButton busy={busyId === item.id} onPress={() => markNext(item)} />
-                  ) : (
-                    <StatusBadge label={label} tone={tone} />
-                  )
-                }
-              />
-            );
-          }}
+          renderItem={({ item }) => (
+            <SeriesRow
+              item={item}
+              tvFilter={tvFilter}
+              busy={busyId === item.id}
+              onOpen={openItem}
+              onMarkNext={markNext}
+            />
+          )}
         />
       )}
     </View>

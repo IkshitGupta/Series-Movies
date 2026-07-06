@@ -55,7 +55,7 @@ export default function GenreScreen() {
                 onPress={() => openItem(item)}
                 subtitle={
                   'watchedEpisodes' in item
-                    ? `${Math.min(item.watchedEpisodes.length, item.totalEpisodes || item.watchedEpisodes.length)}/${item.totalEpisodes} episodes watched`
+                    ? `${Math.min(item.watchedEpisodes.length, (item.airedEpisodes ?? item.totalEpisodes) || item.watchedEpisodes.length)}/${item.airedEpisodes ?? item.totalEpisodes} episodes watched`
                     : undefined
                 }
               />

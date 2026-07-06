@@ -72,6 +72,9 @@ interface LibraryState {
   ) => void;
   /** Store a tracked show's typical episode runtime (minutes) for watch-time stats. */
   setShowEpisodeRuntime: (id: number, runtime: number) => void;
+  /** Keep a tracked show's episode totals in sync with TMDB (new season aired, or
+   * newly-aired episodes changing the released count). */
+  syncShowMeta: (id: number, meta: { totalEpisodes?: number; airedEpisodes?: number }) => void;
   untrackShow: (id: number) => void;
 }
 
@@ -317,6 +320,36 @@ export const useLibraryStore = create<LibraryState>()(
           };
         }),
 
+      syncShowMeta: (id, meta) =>
+        set((state) => {
+          const show = state.trackedShows[id];
+          if (!show) return state;
+          const next = { ...show };
+          let changed = false;
+          // totalEpisodes (incl. announced) drives status/grouping; a new season
+          // aired/announced flips a completed show back to watching.
+          if (
+            meta.totalEpisodes &&
+            meta.totalEpisodes > 0 &&
+            show.totalEpisodes !== meta.totalEpisodes
+          ) {
+            next.totalEpisodes = meta.totalEpisodes;
+            changed = true;
+          }
+          // airedEpisodes (released so far) drives the progress denominator so
+          // unaired future episodes aren't counted as "remaining".
+          if (
+            meta.airedEpisodes &&
+            meta.airedEpisodes > 0 &&
+            show.airedEpisodes !== meta.airedEpisodes
+          ) {
+            next.airedEpisodes = meta.airedEpisodes;
+            changed = true;
+          }
+          if (!changed) return state;
+          return { trackedShows: { ...state.trackedShows, [id]: next } };
+        }),
+
       untrackShow: (id) =>
         set((state) => {
           const next = { ...state.trackedShows };
@@ -373,10 +406,12 @@ export function getShowStatus(show?: TrackedShow): ShowStatus {
 }
 
 export function getShowProgress(show?: TrackedShow): { watched: number; total: number } {
-  const total = show?.totalEpisodes ?? 0;
+  // Progress is measured against episodes released so far (airedEpisodes), so
+  // announced-but-unaired future episodes don't show up as "remaining".
+  const total = show?.airedEpisodes ?? show?.totalEpisodes ?? 0;
   const watched = show?.watchedEpisodes.length ?? 0;
   // Some sources (e.g. TheTVDB imports) split episodes TMDB merges, so the raw
-  // watched count can exceed TMDB's total. Clamp for display only.
+  // watched count can exceed the total. Clamp for display only.
   return { watched: total > 0 ? Math.min(watched, total) : watched, total };
 }
 

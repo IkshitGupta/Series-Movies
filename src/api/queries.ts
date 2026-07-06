@@ -16,6 +16,9 @@ export const queryKeys = {
 // instead of re-hitting the network. Airing shows still revalidate in the
 // background once stale (stale-while-revalidate) and are refreshed on reconnect.
 const DETAIL_STALE_TIME = 1000 * 60 * 60 * 24; // 24h
+// Currently-airing shows change (new episodes/seasons), so revalidate them more
+// often than ended shows/movies.
+const AIRING_STALE_TIME = 1000 * 60 * 60 * 6; // 6h
 
 /** Search movies + shows. Disabled until the query has at least 2 characters. */
 export function useSearch(query: string) {
@@ -46,7 +49,12 @@ export function useShow(id: number) {
     queryKey: queryKeys.tv(id),
     queryFn: () => getTv(id),
     enabled: Number.isFinite(id) && id > 0,
-    staleTime: DETAIL_STALE_TIME,
+    staleTime: (query) => {
+      const data = query.state.data;
+      return data && (data.status === 'Returning Series' || data.in_production)
+        ? AIRING_STALE_TIME
+        : DETAIL_STALE_TIME;
+    },
   });
 }
 

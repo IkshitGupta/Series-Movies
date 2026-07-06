@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -13,9 +14,11 @@ interface MediaCardProps {
   right?: ReactNode;
   /** Optional secondary line, e.g. progress text. */
   subtitle?: string;
+  /** Optional accent pill, e.g. "New season · Aug 12, 2026". */
+  badge?: string;
 }
 
-export function MediaCard({ item, onPress, right, subtitle }: MediaCardProps) {
+export function MediaCard({ item, onPress, right, subtitle, badge }: MediaCardProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -41,6 +44,14 @@ export function MediaCard({ item, onPress, right, subtitle }: MediaCardProps) {
           <Text numberOfLines={1} className="text-xs text-neutral-500 dark:text-neutral-400">
             {subtitle}
           </Text>
+        ) : null}
+        {badge ? (
+          <View className="flex-row items-center gap-1">
+            <Ionicons name="calendar-outline" size={12} color="#E50914" />
+            <Text numberOfLines={1} className="text-xs font-semibold text-brand">
+              {badge}
+            </Text>
+          </View>
         ) : null}
       </View>
 
