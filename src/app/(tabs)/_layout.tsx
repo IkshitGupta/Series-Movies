@@ -24,12 +24,12 @@ export default function TabsLayout() {
   if (!hydrated) return null;
   if (!onboarded) return <Redirect href="/onboarding" />;
 
-  const importButton = () => (
+  const settingsButton = () => (
     <Pressable
-      onPress={() => router.push('/import')}
+      onPress={() => router.push('/settings')}
       hitSlop={12}
       style={{ paddingHorizontal: 12, opacity: 1 }}>
-      <Ionicons name="cloud-upload-outline" size={22} color="#E50914" />
+      <Ionicons name="settings-outline" size={22} color="#E50914" />
     </Pressable>
   );
 
@@ -38,6 +38,7 @@ export default function TabsLayout() {
       screenOptions={{
         tabBarActiveTintColor: '#E50914',
         headerTitleStyle: { fontWeight: '700' },
+        headerRight: settingsButton,
       }}>
       <Tabs.Screen
         name="index"
@@ -53,11 +54,7 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="series"
-        options={{
-          title: 'Series',
-          tabBarIcon: makeTabIcon('tv'),
-          headerRight: importButton,
-        }}
+        options={{ title: 'Series', tabBarIcon: makeTabIcon('tv') }}
       />
       <Tabs.Screen
         name="stats"

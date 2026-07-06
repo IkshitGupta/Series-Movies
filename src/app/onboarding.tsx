@@ -37,7 +37,7 @@ export default function OnboardingScreen() {
 
         <View className="gap-3">
           <Text className="text-center text-sm text-neutral-500 dark:text-neutral-400">
-            Already using TV Time? Bring your watch history with you.
+            Have a data export from another device? Bring your watch history with you.
           </Text>
 
           <Pressable
@@ -45,7 +45,7 @@ export default function OnboardingScreen() {
             className="flex-row items-center justify-center gap-2 rounded-2xl py-4 active:opacity-80"
             style={{ backgroundColor: '#E50914' }}>
             <Ionicons name="cloud-upload-outline" size={20} color="white" />
-            <Text className="text-base font-semibold text-white">Import from TV Time</Text>
+            <Text className="text-base font-semibold text-white">Import data</Text>
           </Pressable>
 
           <Pressable

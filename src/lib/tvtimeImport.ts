@@ -40,6 +40,8 @@ import {
 interface TvTimeId {
   tvdb: number | null;
   imdb: string | null;
+  /** TMDB id — present in our own exports so import can skip the /find lookup. */
+  tmdb?: number | null;
 }
 
 interface TvTimeMovieRaw {
@@ -76,6 +78,7 @@ interface TvTimeSeriesRaw {
 interface ParsedMovie {
   imdbId: string | null;
   tvdbId: number | null;
+  tmdbId: number | null;
   title: string;
   year: number | null;
   watchedAt: number | null;
@@ -84,6 +87,7 @@ interface ParsedMovie {
 
 interface ParsedShow {
   tvdbId: number | null;
+  tmdbId: number | null;
   title: string;
   episodeKeys: Set<string>;
   firstWatchedSeason: number | null;
@@ -165,7 +169,7 @@ export function parseTvTimeZip(bytes: Uint8Array): ParsedExport {
   const seriesRaw = findEntry(files, 'series');
   if (!moviesRaw && !seriesRaw) {
     throw new Error(
-      "Couldn't find the movies/series JSON in the ZIP. Make sure this is your TV Time JSON export (with tvtime-movies-*.json and tvtime-series-*.json).",
+      "Couldn't find the movies/series JSON in the ZIP. Make sure you selected a valid data export (.zip).",
     );
   }
 
@@ -176,6 +180,7 @@ export function parseTvTimeZip(bytes: Uint8Array): ParsedExport {
       movies.push({
         imdbId: m.id?.imdb ?? null,
         tvdbId: m.id?.tvdb ?? null,
+        tmdbId: m.id?.tmdb ?? null,
         title: m.title,
         year: m.year ?? null,
         watchedAt: toEpochMs(m.watched_at),
@@ -203,6 +208,7 @@ export function parseTvTimeZip(bytes: Uint8Array): ParsedExport {
       }
       shows.push({
         tvdbId: s.id?.tvdb ?? null,
+        tmdbId: s.id?.tmdb ?? null,
         title: s.title,
         episodeKeys,
         firstWatchedSeason,
@@ -305,8 +311,10 @@ export async function resolveLibrary(
 
   const movieTasks = parsed.movies.map((m) => async () => {
     try {
-      let movieId: number | null = null;
-      if (m.imdbId) movieId = await withRetry(() => findMovieIdByImdbId(m.imdbId!));
+      // Prefer a direct TMDB id (present in our own exports); otherwise resolve
+      // via external ids / title search (real TV Time exports).
+      let movieId: number | null = m.tmdbId ?? null;
+      if (movieId == null && m.imdbId) movieId = await withRetry(() => findMovieIdByImdbId(m.imdbId!));
       if (movieId == null && m.tvdbId != null) {
         movieId = await withRetry(() => findMovieIdByTvdbId(m.tvdbId!));
       }
@@ -355,22 +363,26 @@ export async function resolveLibrary(
 
   const showTasks = parsed.shows.map((s) => async () => {
     try {
-      if (s.tvdbId == null) {
-        unmatched.push({
-          type: 'show',
-          title: s.title,
-          identifier: '',
-          episodesWatched: s.episodeKeys.size,
-          reason: 'No TheTVDB id in export',
-        });
-        return;
+      // Prefer a direct TMDB id (our own exports); otherwise resolve via TheTVDB.
+      let tmdbId: number | null = s.tmdbId ?? null;
+      if (tmdbId == null) {
+        if (s.tvdbId == null) {
+          unmatched.push({
+            type: 'show',
+            title: s.title,
+            identifier: '',
+            episodesWatched: s.episodeKeys.size,
+            reason: 'No TheTVDB id in export',
+          });
+          return;
+        }
+        tmdbId = await withRetry(() => findTmdbIdByTvdbId(s.tvdbId!));
       }
-      const tmdbId = await withRetry(() => findTmdbIdByTvdbId(s.tvdbId!));
       if (tmdbId == null) {
         unmatched.push({
           type: 'show',
           title: s.title,
-          identifier: String(s.tvdbId),
+          identifier: s.tvdbId != null ? String(s.tvdbId) : '',
           episodesWatched: s.episodeKeys.size,
           reason: 'No TMDB match',
         });

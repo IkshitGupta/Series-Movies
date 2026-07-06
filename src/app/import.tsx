@@ -75,18 +75,18 @@ export default function ImportScreen() {
     if (!result || result.unmatched.length === 0) return;
     const csv = buildUnmatchedCsv(result.unmatched);
     try {
-      const file = new File(Paths.document, 'tvtime-unmatched.csv');
+      const file = new File(Paths.document, 'unmatched-items.csv');
       if (file.exists) file.delete();
       file.create();
       file.write(csv);
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(file.uri, {
           mimeType: 'text/csv',
-          dialogTitle: 'TV Time — items not imported',
+          dialogTitle: 'Items not imported',
           UTI: 'public.comma-separated-values-text',
         });
       } else {
-        await Share.share({ message: csv, title: 'TV Time — items not imported' });
+        await Share.share({ message: csv, title: 'Items not imported' });
       }
     } catch {
       // Last-resort fallback: hand the raw CSV text to any app.
@@ -231,22 +231,22 @@ export default function ImportScreen() {
           <Ionicons name="cloud-upload-outline" size={32} color="white" />
         </View>
         <Text className="text-center text-2xl font-bold text-neutral-900 dark:text-neutral-50">
-          Import from TV Time
+          Import data
         </Text>
         <Text className="text-center text-base text-neutral-500 dark:text-neutral-400">
-          Select your TV Time data export (a .zip file). We&apos;ll import your watched movies and TV
-          episodes, match each title to TMDB, and add anything you haven&apos;t started to your
-          watchlist. Titles we can&apos;t match are listed at the end.
+          Select a data export (a .zip file). We&apos;ll import your watched movies and TV episodes,
+          match each title to TMDB, and add anything you haven&apos;t started to your watchlist. Titles
+          we can&apos;t match are listed at the end.
         </Text>
       </View>
 
       <View className="gap-2 rounded-2xl bg-white p-4 dark:bg-neutral-900">
         <Text className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">
-          How to get your export
+          About the file
         </Text>
         <Text className="text-sm text-neutral-500 dark:text-neutral-400">
-          In TV Time, request your data export from account settings. You&apos;ll receive a .zip by
-          email — pick that file here.
+          It&apos;s a .zip containing your movies and series. You can create one from another device via
+          Settings → Export data, then pick that file here.
         </Text>
       </View>
 

@@ -16,8 +16,9 @@ Built as a modern, cross-platform (iOS + Android) React Native app.
 - 🗂️ **Separate Movies and Series tabs** — watched movies in one tab; series split into **4 views** with counts: *Watching · Completed · Stopped watching · Continue later*.
 - 📊 **Stats** — totals, **total watch time**, and a per-genre breakdown, tracked separately for movies and TV shows. Tap any genre to see the titles in it.
 - 🎭 **Genres** shown on both movie and TV detail screens.
-- 📥 **Import from TV Time** — on first launch (or later from the Series tab) you can bring in your **TV Time data export** (a `.zip` of JSON files). It imports your watched **movies and TV episodes**, maps each title to TMDB, mirrors your per-show status (*stopped* → Stopped watching, *watch later* → Continue later), adds not-yet-started titles to your **watchlist**, and lists anything it couldn't match with a downloadable **CSV report**.
-- 🌓 **Dark mode** that follows your system theme.
+- 📥 **Import your library** — from **Settings → Import data** (or first-launch onboarding) you can bring in a **data export** (a `.zip` of JSON files). It imports your watched **movies and TV episodes**, maps each title to TMDB, mirrors your per-show status (*stopped* → Stopped watching, *watch later* → Continue later), adds not-yet-started titles to your **watchlist**, and lists anything it couldn't match with a downloadable **CSV report**.
+- 📤 **Export / backup** — **Settings → Export data** saves your whole library to a `.zip` in the **same format the importer reads**, so you can back it up or move devices and re-import it (round-trip). Exported items carry their TMDB id, so re-importing resolves instantly and losslessly.
+- 🌓 **Dark mode** — **Settings → Appearance** lets you pick **System / Light / Dark**; the choice is saved and applies across the whole app (screens, headers, tabs, status bar).
 - 💾 **Offline-first** — your data lives on the device via MMKV. No sign-in.
 
 ---
@@ -107,13 +108,46 @@ npm start            # expo start --dev-client
 
 ---
 
+## 🍏 Testing on iOS from Windows (no Mac)
+
+The iOS Simulator is macOS-only, and Expo Go can't load this app (custom native modules). To exercise a
+**real iOS Simulator from Windows**, build a standalone **simulator** build in the EAS cloud and stream it
+in the browser with [Appetize.io](https://appetize.io):
+
+```bash
+# 1. Authenticate (free Expo account). In CI/non-interactive shells use EXPO_TOKEN instead of `eas login`.
+eas login
+
+# 2. One-time: link the project and provide the TMDB key to the cloud build
+#    (the build has no local .env, so the key must live in EAS).
+eas init
+eas env:create --name EXPO_PUBLIC_TMDB_API_KEY --value <your-key> --environment preview --visibility plaintext
+
+# 3. Build the iOS *simulator* app (no Apple Developer account needed for simulator builds).
+#    This repo isn't a git repo, so pass EAS_NO_VCS=1.
+EAS_NO_VCS=1 eas build --platform ios --profile preview-simulator
+
+# 4. Download the resulting .tar.gz artifact, then upload it to Appetize:
+curl -X POST https://api.appetize.io/v1/apps \
+  -H "X-API-KEY: <appetize-token>" \
+  -F "file=@MoviesSeriesHub-ios-sim.tar.gz" -F "platform=ios"
+# → open the returned appURL and interact with the app in your browser.
+```
+
+The `preview-simulator` profile (in [`eas.json`](./eas.json)) sets `ios.simulator: true` and
+`environment: preview`, so the build embeds the JS bundle (runs without your local Metro) with the TMDB
+key baked in. Verified end-to-end: launch, search, dark/light/system, import/export all work on iOS.
+
+---
+
 ## 📦 Building for Distribution
 
 Build profiles live in [`eas.json`](./eas.json):
 
 ```bash
-eas build --profile preview    --platform android   # shareable internal build
-eas build --profile production  --platform all       # store-ready builds
+eas build --profile preview           --platform android   # shareable internal build
+eas build --profile preview-simulator --platform ios       # iOS Simulator build (Appetize / Mac simulator)
+eas build --profile production        --platform all        # store-ready builds
 ```
 
 ---
@@ -134,7 +168,8 @@ src/
     movie/[id].tsx         # movie detail + watched toggle
     show/[id].tsx          # show detail + per-episode tracking
     onboarding.tsx         # first-launch welcome (import or start fresh)
-    import.tsx             # TV Time import flow (pick ZIP → resolve → report)
+    settings.tsx           # Settings: import / export data (room for more)
+    import.tsx             # import flow (pick ZIP → resolve → report)
   api/
     tmdb.ts                # typed fetch client
     queries.ts             # TanStack Query hooks
@@ -143,7 +178,9 @@ src/
     storage.ts             # MMKV adapter for Zustand persist
   components/              # PosterImage, MediaCard, EpisodeRow, etc. (NativeWind)
   lib/                     # image URLs, normalization, hooks
-    tvtimeImport.ts        # TV Time export: unzip + parse + TMDB resolve + report
+    tvtimeImport.ts        # import: unzip + parse + TMDB resolve + report
+    libraryBackup.ts       # export: build a re-importable ZIP of the library
+    nextEpisode.ts         # resolve a show's next unwatched episode
   types/                   # domain + TMDB types
 ```
 
@@ -187,6 +224,19 @@ src/
   runtimes, so watch-time comes from TMDB (`/movie.runtime`, `/tv.episode_run_time`, with a
   season-average fallback). Titles without a confident TMDB match are surfaced and exported as a CSV
   report.
+- **Import/Export use one format.** Export (`lib/libraryBackup.ts`) writes the same ZIP-of-JSON schema
+  the importer reads, adding an `id.tmdb` to each item. The importer prefers `id.tmdb` when present
+  (skipping the `/find` lookup), so a MoviesSeriesHub export round-trips through the exact same import
+  pipeline, while real TV Time exports still resolve via imdb/tvdb.
+- **Appearance / dark mode.** The preference (`system` / `light` / `dark`) is persisted in the Zustand
+  store; the root layout applies it via NativeWind's `setColorScheme(pref)` (which drives all `dark:`
+  variants) and reads the resolved scheme back to pick the navigation `ThemeProvider`
+  (`DarkTheme`/`DefaultTheme`) and `StatusBar` style. `system` follows the OS; `light`/`dark` override it.
+- **iOS back button.** Pushed screens (Settings, Import, movie/show/genre detail) live on the root
+  `Stack`, whose previous entry is the `(tabs)` group. On iOS the native back button shows the previous
+  screen's title, and since `(tabs)` has `headerShown:false`/no title it leaked the raw route name
+  "(tabs)". The root `Stack` sets `headerBackButtonDisplayMode: 'minimal'` (chevron only) to avoid this.
+  (Android hides back-button labels, so this only reproduces on iOS.)
 
 ---
 

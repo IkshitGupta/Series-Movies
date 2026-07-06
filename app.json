@@ -2,6 +2,7 @@
   "expo": {
     "name": "MoviesSeriesHub",
     "slug": "MoviesSeriesHub",
+    "owner": "sting1712s-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -32,6 +33,8 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76,
           "android": {
             "image": "./assets/images/splash-icon.png",
             "imageWidth": 76
@@ -42,6 +45,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b9f72627-0b03-4eea-8a9c-023f7e65c20d"
+      }
     }
   }
 }

@@ -8,6 +8,7 @@ import {
   type MediaItem,
   type ShowStatus,
   type ShowUserStatus,
+  type ThemePref,
   type TrackedShow,
   type WatchedMovie,
   type WatchlistItem,
@@ -22,6 +23,11 @@ interface LibraryState {
   trackedShows: Record<number, TrackedShow>;
   /** Whether the one-time first-launch onboarding has been completed. */
   onboarded: boolean;
+  /** Appearance preference (System / Light / Dark). */
+  theme: ThemePref;
+
+  // --- Appearance ---
+  setTheme: (theme: ThemePref) => void;
 
   // --- Onboarding / import ---
   setOnboarded: (value: boolean) => void;
@@ -103,6 +109,9 @@ export const useLibraryStore = create<LibraryState>()(
       watchedMovies: {},
       trackedShows: {},
       onboarded: false,
+      theme: 'system',
+
+      setTheme: (theme) => set({ theme }),
 
       setOnboarded: (value) => set({ onboarded: value }),
 

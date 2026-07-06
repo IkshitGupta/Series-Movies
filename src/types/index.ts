@@ -49,6 +49,9 @@ export type ShowStatus = 'not_started' | 'watching' | 'completed';
  */
 export type ShowUserStatus = 'stopped' | 'continue_later';
 
+/** App appearance preference. `system` follows the device setting. */
+export type ThemePref = 'system' | 'light' | 'dark';
+
 /** Stable key for a single episode, e.g. `S1E4`. */
 export function episodeKey(seasonNumber: number, episodeNumber: number): string {
   return `S${seasonNumber}E${episodeNumber}`;
