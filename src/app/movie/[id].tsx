@@ -1,16 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useMovie } from '@/api/queries';
 import { EmptyState } from '@/components/EmptyState';
+import { Fact } from '@/components/Fact';
 import { PosterImage } from '@/components/PosterImage';
+import { RecommendationsRow } from '@/components/RecommendationsRow';
 import { WatchlistButton } from '@/components/WatchlistButton';
 import { movieToMediaItem } from '@/lib/normalize';
+import { getMovieCertification, normalizeRecommendations } from '@/lib/tmdbExtras';
 import { profileUrl } from '@/lib/tmdbImage';
 import { useIsMovieWatched, useLibraryStore } from '@/store/useLibraryStore';
+import type { MediaItem } from '@/types';
 
 function formatRuntime(min: number | null): string | null {
   if (!min) return null;
@@ -22,6 +26,7 @@ function formatRuntime(min: number | null): string | null {
 export default function MovieDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const movieId = Number(id);
+  const router = useRouter();
 
   const { data: movie, isLoading, isError, error } = useMovie(movieId);
   const watched = useIsMovieWatched(movieId);
@@ -59,6 +64,18 @@ export default function MovieDetailScreen() {
   const item = movieToMediaItem(movie);
   const runtime = formatRuntime(movie.runtime);
   const cast = movie.credits?.cast?.slice(0, 12) ?? [];
+  const cert = getMovieCertification(movie);
+  const recs = normalizeRecommendations(movie.recommendations?.results, 'movie').slice(0, 12);
+  const studios = (movie.production_companies ?? []).slice(0, 3).map((c) => c.name);
+  const hasFacts = studios.length > 0;
+
+  const openRec = (rec: MediaItem) => {
+    if (rec.mediaType === 'movie') {
+      router.push({ pathname: '/movie/[id]', params: { id: String(rec.id) } });
+    } else {
+      router.push({ pathname: '/show/[id]', params: { id: String(rec.id) } });
+    }
+  };
 
   return (
     <>
@@ -72,9 +89,23 @@ export default function MovieDetailScreen() {
             <Text className="text-xl font-bold text-neutral-900 dark:text-neutral-50">
               {movie.title}
             </Text>
-            <Text className="text-sm text-neutral-500 dark:text-neutral-400">
-              {[item.year, runtime].filter(Boolean).join('  •  ')}
-            </Text>
+            <View className="flex-row flex-wrap items-center gap-2">
+              <Text className="text-sm text-neutral-500 dark:text-neutral-400">
+                {[item.year, runtime].filter(Boolean).join('  •  ')}
+              </Text>
+              {cert ? (
+                <View className="rounded border border-neutral-400 px-1 dark:border-neutral-600">
+                  <Text className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400">
+                    {cert}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            {movie.tagline ? (
+              <Text className="text-sm italic text-neutral-500 dark:text-neutral-400">
+                {movie.tagline}
+              </Text>
+            ) : null}
             {movie.vote_average ? (
               <View className="flex-row items-center gap-1">
                 <Ionicons name="star" size={14} color="#f5c518" />
@@ -127,6 +158,12 @@ export default function MovieDetailScreen() {
           </View>
         ) : null}
 
+        {hasFacts ? (
+          <View className="gap-1 px-4 pb-2">
+            {studios.length > 0 ? <Fact label="Studio" value={studios.join(', ')} /> : null}
+          </View>
+        ) : null}
+
         {cast.length > 0 ? (
           <View className="gap-2 pb-2">
             <Text className="px-4 text-base font-semibold text-neutral-900 dark:text-neutral-50">
@@ -167,6 +204,8 @@ export default function MovieDetailScreen() {
             </ScrollView>
           </View>
         ) : null}
+
+        <RecommendationsRow items={recs} onOpen={openRec} />
       </ScrollView>
     </>
   );

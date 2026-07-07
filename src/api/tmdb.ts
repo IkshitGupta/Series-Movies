@@ -1,4 +1,6 @@
 import type {
+  TmdbDiscoverResponse,
+  TmdbKeywordSearchResponse,
   TmdbMovieDetails,
   TmdbSearchResponse,
   TmdbSeasonDetails,
@@ -75,11 +77,38 @@ export function searchMulti(query: string): Promise<TmdbSearchResponse> {
 }
 
 export function getMovie(id: number): Promise<TmdbMovieDetails> {
-  return tmdbFetch<TmdbMovieDetails>(`/movie/${id}`, { append_to_response: 'credits' });
+  return tmdbFetch<TmdbMovieDetails>(`/movie/${id}`, {
+    append_to_response: 'credits,recommendations,release_dates',
+  });
 }
 
 export function getTv(id: number): Promise<TmdbTvDetails> {
-  return tmdbFetch<TmdbTvDetails>(`/tv/${id}`, { append_to_response: 'credits' });
+  return tmdbFetch<TmdbTvDetails>(`/tv/${id}`, {
+    append_to_response: 'credits,recommendations,content_ratings',
+  });
+}
+
+/** Trending movies + TV this week (mixed), for the Search screen's discovery view. */
+export function getTrending(): Promise<TmdbSearchResponse> {
+  return tmdbFetch<TmdbSearchResponse>('/trending/all/week', {});
+}
+
+/** Look up TMDB keywords matching a free-text query (e.g. "heist" → {id, name}). */
+export function searchKeyword(query: string): Promise<TmdbKeywordSearchResponse> {
+  return tmdbFetch<TmdbKeywordSearchResponse>('/search/keyword', { query, page: 1 });
+}
+
+/** Discover movies or shows tagged with a keyword id, most popular first. */
+export function discoverByKeyword(
+  keywordId: number,
+  mediaType: 'movie' | 'tv',
+): Promise<TmdbDiscoverResponse> {
+  return tmdbFetch<TmdbDiscoverResponse>(`/discover/${mediaType}`, {
+    with_keywords: keywordId,
+    sort_by: 'popularity.desc',
+    include_adult: false,
+    page: 1,
+  });
 }
 
 export function getSeason(tvId: number, seasonNumber: number): Promise<TmdbSeasonDetails> {

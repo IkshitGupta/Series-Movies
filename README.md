@@ -8,7 +8,8 @@ Built as a modern, cross-platform (iOS + Android) React Native app.
 
 ## ✨ Features
 
-- 🔎 **Search** movies & TV shows via TMDB (posters, ratings, cast, genres).
+- 🔎 **Search** movies & TV shows via TMDB (posters, ratings, cast, genres). When the search box is empty, it shows **Trending this week**. If your query matches a theme (TMDB keyword), an **"Explore the '…' theme"** chip opens a discovery list of similarly-tagged titles — without polluting the title results.
+- 🎬 **Rich detail screens** — tagline, age rating (PG-13 / TV-MA), studio (movies), network (shows), and a **"More like this"** recommendations carousel.
 - ✅ **Mark movies watched** with a single tap.
 - 📺 **Per-episode TV tracking** — tick individual episodes, "mark all" a season, mark the **whole series** watched, or tap **↑ to mark everything up to an episode** (including previous seasons). Live progress bar. In the **Watching** and **Continue later** lists, a **Next** button marks the next unwatched episode in one tap (and resumes a paused show).
 - 🔖 **"To Watch" watchlist** split into **Movies** and **TV Series** tabs. Items already watched or categorized no longer offer a "to watch" option.

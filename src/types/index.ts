@@ -88,6 +88,30 @@ export interface TmdbSearchResponse {
   total_results: number;
 }
 
+export interface TmdbKeyword {
+  id: number;
+  name: string;
+}
+
+export interface TmdbKeywordSearchResponse {
+  results: TmdbKeyword[];
+}
+
+/** A `/discover/movie` or `/discover/tv` result (no `media_type`; set by caller). */
+export interface TmdbDiscoverItem {
+  id: number;
+  title?: string;
+  name?: string;
+  poster_path: string | null;
+  release_date?: string;
+  first_air_date?: string;
+  popularity?: number;
+}
+
+export interface TmdbDiscoverResponse {
+  results: TmdbDiscoverItem[];
+}
+
 export interface TmdbGenre {
   id: number;
   name: string;
@@ -98,6 +122,27 @@ export interface TmdbCastMember {
   name: string;
   character: string;
   profile_path: string | null;
+}
+
+export interface TmdbCompany {
+  id: number;
+  name: string;
+  logo_path?: string | null;
+}
+
+/** Recommended/similar titles (from `recommendations`). */
+export interface TmdbRecommendationItem {
+  id: number;
+  title?: string;
+  name?: string;
+  poster_path: string | null;
+  release_date?: string;
+  first_air_date?: string;
+  media_type?: 'movie' | 'tv';
+}
+
+export interface TmdbRecommendations {
+  results: TmdbRecommendationItem[];
 }
 
 export interface TmdbMovieDetails {
@@ -111,6 +156,16 @@ export interface TmdbMovieDetails {
   vote_average: number;
   genres: TmdbGenre[];
   credits?: { cast: TmdbCastMember[] };
+  tagline?: string;
+  original_language?: string;
+  production_companies?: TmdbCompany[];
+  recommendations?: TmdbRecommendations;
+  release_dates?: {
+    results: {
+      iso_3166_1: string;
+      release_dates: { certification: string; type: number }[];
+    }[];
+  };
 }
 
 export interface TmdbSeasonSummary {
@@ -152,6 +207,13 @@ export interface TmdbTvDetails {
   next_episode_to_air: TmdbNextEpisode | null;
   /** The most recent episode that has already aired (null if none yet). */
   last_episode_to_air: TmdbNextEpisode | null;
+  tagline?: string;
+  /** e.g. "Scripted" | "Miniseries" | "Documentary". */
+  type?: string;
+  original_language?: string;
+  networks?: TmdbCompany[];
+  recommendations?: TmdbRecommendations;
+  content_ratings?: { results: { iso_3166_1: string; rating: string }[] };
 }
 
 export interface TmdbEpisode {

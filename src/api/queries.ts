@@ -1,11 +1,22 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { getMovie, getSeason, getTv, searchMulti } from '@/api/tmdb';
-import { normalizeSearchItem } from '@/lib/normalize';
-import type { MediaItem } from '@/types';
+import {
+  discoverByKeyword,
+  getMovie,
+  getSeason,
+  getTrending,
+  getTv,
+  searchKeyword,
+  searchMulti,
+} from '@/api/tmdb';
+import { discoverItemToMediaItem, normalizeSearchItem } from '@/lib/normalize';
+import type { MediaItem, TmdbKeyword } from '@/types';
 
 export const queryKeys = {
   search: (query: string) => ['search', query] as const,
+  trending: () => ['trending'] as const,
+  keyword: (query: string) => ['keyword', query] as const,
+  keywordDiscover: (id: number) => ['keyword-discover', id] as const,
   movie: (id: number) => ['movie', id] as const,
   tv: (id: number) => ['tv', id] as const,
   season: (id: number, seasonNumber: number) => ['tv', id, 'season', seasonNumber] as const,
@@ -31,6 +42,57 @@ export function useSearch(query: string) {
       return res.results
         .map(normalizeSearchItem)
         .filter((item): item is MediaItem => item !== null);
+    },
+  });
+}
+
+export function useTrending() {
+  return useQuery({
+    queryKey: queryKeys.trending(),
+    queryFn: async (): Promise<MediaItem[]> => {
+      const res = await getTrending();
+      return res.results
+        .map(normalizeSearchItem)
+        .filter((item): item is MediaItem => item !== null);
+    },
+    staleTime: 1000 * 60 * 60, // 1h — trending changes slowly
+  });
+}
+
+/**
+ * If the search text exactly matches a TMDB keyword (case-insensitive), return
+ * it so the Search screen can offer a "browse this theme" affordance. Being
+ * strict avoids offering a theme for ordinary title queries (e.g. "Inception").
+ */
+export function useKeywordMatch(query: string) {
+  const trimmed = query.trim();
+  return useQuery({
+    queryKey: queryKeys.keyword(trimmed.toLowerCase()),
+    enabled: trimmed.length >= 3,
+    staleTime: 1000 * 60 * 60 * 24,
+    queryFn: async (): Promise<TmdbKeyword | null> => {
+      const res = await searchKeyword(trimmed);
+      const lower = trimmed.toLowerCase();
+      return res.results.find((k) => k.name.toLowerCase() === lower) ?? null;
+    },
+  });
+}
+
+export function useDiscoverByKeyword(keywordId: number) {
+  return useQuery({
+    queryKey: queryKeys.keywordDiscover(keywordId),
+    enabled: Number.isFinite(keywordId) && keywordId > 0,
+    staleTime: 1000 * 60 * 60 * 12,
+    queryFn: async (): Promise<MediaItem[]> => {
+      const [movies, shows] = await Promise.all([
+        discoverByKeyword(keywordId, 'movie'),
+        discoverByKeyword(keywordId, 'tv'),
+      ]);
+      const merged = [
+        ...movies.results.map((m) => ({ item: discoverItemToMediaItem(m, 'movie'), pop: m.popularity ?? 0 })),
+        ...shows.results.map((s) => ({ item: discoverItemToMediaItem(s, 'tv'), pop: s.popularity ?? 0 })),
+      ];
+      return merged.sort((a, b) => b.pop - a.pop).map((x) => x.item);
     },
   });
 }

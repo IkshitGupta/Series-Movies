@@ -1,5 +1,6 @@
 import type {
   MediaItem,
+  TmdbDiscoverItem,
   TmdbMovieDetails,
   TmdbSearchItem,
   TmdbTvDetails,
@@ -41,5 +42,19 @@ export function tvToMediaItem(show: TmdbTvDetails): MediaItem {
     posterPath: show.poster_path,
     year: yearFromDate(show.first_air_date),
     genres: show.genres.map((g) => g.name),
+  };
+}
+
+/** Normalize a `/discover/{movie|tv}` result (which carries no `media_type`). */
+export function discoverItemToMediaItem(
+  item: TmdbDiscoverItem,
+  mediaType: 'movie' | 'tv',
+): MediaItem {
+  return {
+    id: item.id,
+    mediaType,
+    title: item.title ?? item.name ?? 'Untitled',
+    posterPath: item.poster_path,
+    year: yearFromDate(item.release_date ?? item.first_air_date),
   };
 }

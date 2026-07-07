@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
@@ -8,11 +8,14 @@ import { queryKeys, useSeason, useShow } from '@/api/queries';
 import { getSeason } from '@/api/tmdb';
 import { EmptyState } from '@/components/EmptyState';
 import { EpisodeRow } from '@/components/EpisodeRow';
+import { Fact } from '@/components/Fact';
 import { PosterImage } from '@/components/PosterImage';
 import { ProgressBar } from '@/components/ProgressBar';
+import { RecommendationsRow } from '@/components/RecommendationsRow';
 import { WatchlistButton } from '@/components/WatchlistButton';
 import { getUpcoming, airedEpisodeCount, upcomingLabel } from '@/lib/airing';
 import { tvToMediaItem } from '@/lib/normalize';
+import { getTvCertification, normalizeRecommendations } from '@/lib/tmdbExtras';
 import {
   getShowStatus,
   useLibraryStore,
@@ -149,6 +152,7 @@ export default function ShowDetailScreen() {
   const tracked = useTrackedShow(showId);
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
   const queryClient = useQueryClient();
+  const router = useRouter();
   const markEpisodesWatched = useLibraryStore((s) => s.markEpisodesWatched);
   const setShowStatus = useLibraryStore((s) => s.setShowStatus);
   const syncShowMeta = useLibraryStore((s) => s.syncShowMeta);
@@ -216,6 +220,19 @@ export default function ShowDetailScreen() {
             ? 'Watching'
             : 'Not started';
 
+  const cert = getTvCertification(show);
+  const network = (show.networks ?? [])[0]?.name ?? null;
+  const recs = normalizeRecommendations(show.recommendations?.results, 'tv').slice(0, 12);
+  const showType = show.type && show.type !== 'Scripted' ? show.type : null;
+  const hasFacts = Boolean(showType);
+  const openRec = (rec: MediaItem) => {
+    if (rec.mediaType === 'movie') {
+      router.push({ pathname: '/movie/[id]', params: { id: String(rec.id) } });
+    } else {
+      router.push({ pathname: '/show/[id]', params: { id: String(rec.id) } });
+    }
+  };
+
   async function fetchEpisodeKeys(
     seasonNumbers: number[],
     limit?: { season: number; episode: number },
@@ -280,11 +297,33 @@ export default function ShowDetailScreen() {
             <Text className="text-xl font-bold text-neutral-900 dark:text-neutral-50">
               {show.name}
             </Text>
-            <Text className="text-sm text-neutral-500 dark:text-neutral-400">
-              {[item.year, `${show.number_of_seasons} season${show.number_of_seasons === 1 ? '' : 's'}`]
-                .filter(Boolean)
-                .join('  •  ')}
-            </Text>
+            <View className="flex-row flex-wrap items-center gap-2">
+              <Text className="text-sm text-neutral-500 dark:text-neutral-400">
+                {[item.year, `${show.number_of_seasons} season${show.number_of_seasons === 1 ? '' : 's'}`]
+                  .filter(Boolean)
+                  .join('  •  ')}
+              </Text>
+              {cert ? (
+                <View className="rounded border border-neutral-400 px-1 dark:border-neutral-600">
+                  <Text className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400">
+                    {cert}
+                  </Text>
+                </View>
+              ) : null}
+              {network ? (
+                <View className="flex-row items-center gap-1 rounded-full bg-neutral-200 px-2 py-0.5 dark:bg-neutral-800">
+                  <Ionicons name="tv-outline" size={11} color="#9ca3af" />
+                  <Text className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">
+                    {network}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            {show.tagline ? (
+              <Text className="text-sm italic text-neutral-500 dark:text-neutral-400">
+                {show.tagline}
+              </Text>
+            ) : null}
             {show.vote_average ? (
               <View className="flex-row items-center gap-1">
                 <Ionicons name="star" size={14} color="#f5c518" />
@@ -381,6 +420,12 @@ export default function ShowDetailScreen() {
           </View>
         ) : null}
 
+        {hasFacts ? (
+          <View className="gap-1 px-4 pb-2">
+            {showType ? <Fact label="Type" value={showType} /> : null}
+          </View>
+        ) : null}
+
         {seasons.length > 0 ? (
           <ScrollView
             horizontal
@@ -412,6 +457,8 @@ export default function ShowDetailScreen() {
           onWatchTillHere={markTillHere}
           busy={busy}
         />
+
+        <RecommendationsRow items={recs} onOpen={openRec} />
       </ScrollView>
     </>
   );
