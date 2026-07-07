@@ -56,6 +56,9 @@ interface TvTimeEpisodeRaw {
   number: number;
   special: boolean;
   is_watched: boolean;
+  /** ISO date the episode was watched. Present in our own exports; often absent
+   * in real TV Time exports. */
+  watched_at?: string | null;
 }
 
 interface TvTimeSeasonRaw {
@@ -90,6 +93,8 @@ interface ParsedShow {
   tmdbId: number | null;
   title: string;
   episodeKeys: Set<string>;
+  /** Watched date (epoch ms) per episode key, when the export carries one. */
+  episodeWatchedAt: Record<string, number>;
   firstWatchedSeason: number | null;
   userStatus?: ShowUserStatus;
   hasWatched: boolean;
@@ -194,13 +199,17 @@ export function parseTvTimeZip(bytes: Uint8Array): ParsedExport {
     const raw = JSON.parse(strFromU8(seriesRaw)) as TvTimeSeriesRaw[];
     for (const s of raw) {
       const episodeKeys = new Set<string>();
+      const episodeWatchedAt: Record<string, number> = {};
       let firstWatchedSeason: number | null = null;
       for (const season of s.seasons ?? []) {
         // Skip specials (season 0); the app tracks numbered episodes only.
         if (season.number < 1 || season.is_specials) continue;
         for (const ep of season.episodes ?? []) {
           if (!ep.is_watched || ep.special) continue;
-          episodeKeys.add(episodeKey(season.number, ep.number));
+          const key = episodeKey(season.number, ep.number);
+          episodeKeys.add(key);
+          const ms = toEpochMs(ep.watched_at ?? null);
+          if (ms != null) episodeWatchedAt[key] = ms;
           if (firstWatchedSeason == null || season.number < firstWatchedSeason) {
             firstWatchedSeason = season.number;
           }
@@ -211,6 +220,7 @@ export function parseTvTimeZip(bytes: Uint8Array): ParsedExport {
         tmdbId: s.id?.tmdb ?? null,
         title: s.title,
         episodeKeys,
+        episodeWatchedAt,
         firstWatchedSeason,
         userStatus: mapUserStatus(s.status),
         hasWatched: episodeKeys.size > 0,
@@ -403,6 +413,8 @@ export async function resolveLibrary(
         shows[tmdbId] = {
           ...base,
           watchedEpisodes: [...s.episodeKeys],
+          episodeWatchedAt:
+            Object.keys(s.episodeWatchedAt).length > 0 ? s.episodeWatchedAt : undefined,
           totalEpisodes: d.number_of_episodes,
           episodeRuntime,
           userStatus: s.userStatus,

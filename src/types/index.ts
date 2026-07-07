@@ -33,6 +33,11 @@ export interface WatchedMovie extends MediaItem {
  */
 export interface TrackedShow extends MediaItem {
   watchedEpisodes: string[];
+  /** When each episode was marked watched (epoch ms), keyed by {@link episodeKey}.
+   * Recorded on interactive marking (and restored from imports that carry dates);
+   * may be absent for episodes marked before this was tracked. Internal data for
+   * future history/recap features — not surfaced in the UI yet. */
+  episodeWatchedAt?: Record<string, number>;
   totalEpisodes: number;
   lastUpdated: number;
   /** Episodes released so far (from TMDB), used for progress so unaired future

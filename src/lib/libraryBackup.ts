@@ -9,6 +9,7 @@
 import { strToU8, zipSync } from 'fflate';
 
 import type { TrackedShow, WatchedMovie, WatchlistItem } from '@/types';
+import { episodeKey } from '@/types';
 
 export interface LibrarySnapshot {
   watchedMovies: Record<number, WatchedMovie>;
@@ -36,7 +37,7 @@ interface ExportEpisode {
   name: string;
   special: boolean;
   is_watched: boolean;
-  watched_at: null;
+  watched_at: string | null;
   rewatch_count: number;
   watched_count: number;
 }
@@ -77,7 +78,10 @@ function reverseStatus(show: TrackedShow): string {
 }
 
 /** Rebuild season/episode groups from `S{n}E{n}` watched-episode keys. */
-function groupSeasons(watchedEpisodes: string[]): ExportSeason[] {
+function groupSeasons(
+  watchedEpisodes: string[],
+  episodeWatchedAt?: Record<string, number>,
+): ExportSeason[] {
   const bySeason = new Map<number, number[]>();
   for (const key of watchedEpisodes) {
     const match = /^S(\d+)E(\d+)$/.exec(key);
@@ -101,7 +105,7 @@ function groupSeasons(watchedEpisodes: string[]): ExportSeason[] {
           name: '',
           special: false,
           is_watched: true,
-          watched_at: null,
+          watched_at: toIso(episodeWatchedAt?.[episodeKey(number, n)]),
           rewatch_count: 0,
           watched_count: 1,
         })),
@@ -130,7 +134,7 @@ export function buildExportZip(snapshot: LibrarySnapshot): Uint8Array {
     title: s.title,
     status: reverseStatus(s),
     _noEpisodeData: false,
-    seasons: groupSeasons(s.watchedEpisodes),
+    seasons: groupSeasons(s.watchedEpisodes, s.episodeWatchedAt),
   }));
 
   for (const item of snapshot.watchlist) {

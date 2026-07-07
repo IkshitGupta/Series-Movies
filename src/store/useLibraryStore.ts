@@ -131,6 +131,8 @@ export const useLibraryStore = create<LibraryState>()(
                 ...existing,
                 ...incoming,
                 watchedEpisodes: [...union],
+                // Merge watched dates; keep the existing (usually earlier) stamp on conflict.
+                episodeWatchedAt: { ...incoming.episodeWatchedAt, ...existing.episodeWatchedAt },
                 userStatus: incoming.userStatus ?? existing.userStatus,
                 lastUpdated: Date.now(),
               };
@@ -221,6 +223,10 @@ export const useLibraryStore = create<LibraryState>()(
           const watchedEpisodes = has
             ? show.watchedEpisodes.filter((k) => k !== key)
             : [...show.watchedEpisodes, key];
+          // Record when the episode was marked watched (or forget it when unticked).
+          const episodeWatchedAt = { ...show.episodeWatchedAt };
+          if (has) delete episodeWatchedAt[key];
+          else episodeWatchedAt[key] = Date.now();
           // Watching a new episode means the user resumed: clear any manual flag.
           const userStatus = has ? show.userStatus : undefined;
           // A show with no progress and no manual status is no longer tracked.
@@ -232,7 +238,13 @@ export const useLibraryStore = create<LibraryState>()(
           return {
             trackedShows: {
               ...state.trackedShows,
-              [item.id]: { ...show, watchedEpisodes, lastUpdated: Date.now(), userStatus },
+              [item.id]: {
+                ...show,
+                watchedEpisodes,
+                episodeWatchedAt,
+                lastUpdated: Date.now(),
+                userStatus,
+              },
             },
             // Once a show has any progress it is no longer merely "to watch".
             watchlist:
@@ -247,7 +259,18 @@ export const useLibraryStore = create<LibraryState>()(
           const show = ensureTracked(state.trackedShows, item, totalEpisodes);
           const keys = episodeNumbers.map((n) => episodeKey(seasonNumber, n));
           const keySet = new Set(show.watchedEpisodes);
-          keys.forEach((k) => (watched ? keySet.add(k) : keySet.delete(k)));
+          const episodeWatchedAt = { ...show.episodeWatchedAt };
+          const now = Date.now();
+          keys.forEach((k) => {
+            if (watched) {
+              // Only stamp newly-added episodes so an existing watched date is kept.
+              if (!keySet.has(k)) episodeWatchedAt[k] = now;
+              keySet.add(k);
+            } else {
+              keySet.delete(k);
+              delete episodeWatchedAt[k];
+            }
+          });
           const watchedEpisodes = [...keySet];
           const userStatus = watched ? undefined : show.userStatus;
           if (watchedEpisodes.length === 0 && !userStatus) {
@@ -258,7 +281,13 @@ export const useLibraryStore = create<LibraryState>()(
           return {
             trackedShows: {
               ...state.trackedShows,
-              [item.id]: { ...show, watchedEpisodes, lastUpdated: Date.now(), userStatus },
+              [item.id]: {
+                ...show,
+                watchedEpisodes,
+                episodeWatchedAt,
+                lastUpdated: Date.now(),
+                userStatus,
+              },
             },
             watchlist:
               watchedEpisodes.length > 0
@@ -271,7 +300,12 @@ export const useLibraryStore = create<LibraryState>()(
         set((state) => {
           const show = ensureTracked(state.trackedShows, item, totalEpisodes);
           const keySet = new Set(show.watchedEpisodes);
-          keys.forEach((k) => keySet.add(k));
+          const episodeWatchedAt = { ...show.episodeWatchedAt };
+          const now = Date.now();
+          keys.forEach((k) => {
+            if (!keySet.has(k)) episodeWatchedAt[k] = now;
+            keySet.add(k);
+          });
           const watchedEpisodes = [...keySet];
           return {
             trackedShows: {
@@ -279,6 +313,7 @@ export const useLibraryStore = create<LibraryState>()(
               [item.id]: {
                 ...show,
                 watchedEpisodes,
+                episodeWatchedAt,
                 lastUpdated: Date.now(),
                 userStatus: undefined,
               },
