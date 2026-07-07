@@ -4,6 +4,7 @@ import { type ComponentProps } from 'react';
 import { Pressable, type ColorValue } from 'react-native';
 
 import { useLibraryStore, useStoreHydrated } from '@/store/useLibraryStore';
+import { COLORS } from '@/theme/colors';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -29,14 +30,14 @@ export default function TabsLayout() {
       onPress={() => router.push('/settings')}
       hitSlop={12}
       style={{ paddingHorizontal: 12, opacity: 1 }}>
-      <Ionicons name="settings-outline" size={22} color="#E50914" />
+      <Ionicons name="settings-outline" size={22} color={COLORS.brand} />
     </Pressable>
   );
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#E50914',
+        tabBarActiveTintColor: COLORS.brand,
         headerTitleStyle: { fontWeight: '700' },
         headerRight: settingsButton,
       }}>

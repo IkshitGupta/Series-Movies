@@ -8,8 +8,8 @@ Built as a modern, cross-platform (iOS + Android) React Native app.
 
 ## ✨ Features
 
-- 🔎 **Search** movies & TV shows via TMDB (posters, ratings, cast, genres). When the search box is empty, it shows **Trending this week**. If your query matches a theme (TMDB keyword), an **"Explore the '…' theme"** chip opens a discovery list of similarly-tagged titles — without polluting the title results.
-- 🎬 **Rich detail screens** — tagline, age rating (PG-13 / TV-MA), studio (movies), network (shows), and a **"More like this"** recommendations carousel.
+- 🔎 **Search** movies & TV shows via TMDB (posters, ratings, cast, genres). When the search box is empty, it shows **Trending this week**. Titles already in your library show a muted **✓ "in library"** marker. If your query matches a theme (TMDB keyword), an **"Explore the '…' theme"** chip opens a discovery list of similarly-tagged titles — without polluting the title results.
+- 🎬 **Rich detail screens** — a subtle **backdrop hero** behind the header, plus tagline, age rating (PG-13 / TV-MA), studio (movies), network (shows), and a **"More like this"** recommendations carousel. Lists and detail screens use **skeleton loaders** while fetching.
 - ✅ **Mark movies watched** with a single tap.
 - 📺 **Per-episode TV tracking** — tick individual episodes, "mark all" a season, mark the **whole series** watched, or tap **↑ to mark everything up to an episode** (including previous seasons). Live progress bar. In the **Watching** and **Continue later** lists, a **Next** button marks the next unwatched episode in one tap (and resumes a paused show).
 - 🔖 **"To Watch" watchlist** split into **Movies** and **TV Series** tabs. Items already watched or categorized no longer offer a "to watch" option.
@@ -17,7 +17,7 @@ Built as a modern, cross-platform (iOS + Android) React Native app.
 - 🗂️ **Separate Movies and Series tabs** — watched movies in one tab; series split into **4 views** with counts: *Watching · Completed · Stopped watching · Continue later*.
 - ↕️ **Sort your lists** — the **Movies**, **Series**, and **Watchlist** tabs each have a compact sort bar: **Recent** (default), **Title (A–Z)**, or **Release year**. Tap the active chip to flip the direction (↑/↓). Resets to Recent each launch.
 - 🗓️ **Upcoming seasons/episodes** — shows still airing display a badge in the Series list and a banner on the show screen (from TMDB): **"New season · &lt;date&gt;"** / **"New episode · &lt;date&gt;"** when a date is known, or **"New season coming"** when the show is renewed/ongoing but nothing is scheduled yet. Airing shows also refresh more often than finished ones. Progress counts only **episodes released so far**, so announced-but-unaired episodes aren't shown as "remaining" (e.g. 20/21, not 20/26).
-- 📊 **Stats** — totals, **total watch time**, and a per-genre breakdown, tracked separately for movies and TV shows. Tap any genre to see the titles in it.
+- 📊 **Stats** — totals, **total watch time**, and a per-genre breakdown, tracked separately for movies and TV shows. The genre list shows your **top 6** genres with a **Show all / Show less** toggle. Tap any genre to see the titles in it.
 - 🎭 **Genres** shown on both movie and TV detail screens.
 - 📥 **Import your library** — from **Settings → Import data** (or first-launch onboarding) you can bring in a **data export** (a `.zip` of JSON files). It imports your watched **movies and TV episodes**, maps each title to TMDB, mirrors your per-show status (*stopped* → Stopped watching, *watch later* → Continue later), adds not-yet-started titles to your **watchlist**, and lists anything it couldn't match with a downloadable **CSV report**.
 - 📤 **Export / backup** — **Settings → Export data** saves your whole library to a `.zip` in the **same format the importer reads**, so you can back it up or move devices and re-import it (round-trip). Exported items carry their TMDB id, so re-importing resolves instantly and losslessly.

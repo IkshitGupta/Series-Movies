@@ -1,16 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { useKeywordMatch, useSearch, useTrending } from '@/api/queries';
 import { hasApiKey } from '@/api/tmdb';
 import { EmptyState } from '@/components/EmptyState';
 import { MediaCard } from '@/components/MediaCard';
 import { SearchBar } from '@/components/SearchBar';
+import { MediaListSkeleton } from '@/components/Skeleton';
 import { WatchlistButton } from '@/components/WatchlistButton';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import type { MediaItem } from '@/types';
+
+import { COLORS } from '@/theme/colors';
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -31,13 +34,13 @@ export default function SearchScreen() {
           router.push({ pathname: '/keyword/[id]', params: { id: String(kw.id), name: kw.name } })
         }
         className="mb-2 flex-row items-center gap-2 rounded-xl bg-neutral-100 px-3 py-2.5 active:opacity-80 dark:bg-neutral-900">
-        <Ionicons name="sparkles-outline" size={16} color="#E50914" />
+        <Ionicons name="sparkles-outline" size={16} color={COLORS.brand} />
         <Text className="flex-1 text-sm text-neutral-700 dark:text-neutral-200">
           Explore the{' '}
           <Text className="font-semibold text-neutral-900 dark:text-neutral-50">“{kw.name}”</Text>{' '}
           theme
         </Text>
-        <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+        <Ionicons name="chevron-forward" size={16} color={COLORS.muted} />
       </Pressable>
     ) : null;
 
@@ -76,7 +79,7 @@ export default function SearchScreen() {
               <MediaCard
                 item={item}
                 onPress={() => openItem(item)}
-                right={<WatchlistButton item={item} />}
+                right={<WatchlistButton item={item} showCategorizedState />}
               />
             )}
           />
@@ -91,11 +94,7 @@ export default function SearchScreen() {
       );
     }
     if (isLoading || (isFetching && !data)) {
-      return (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#E50914" />
-        </View>
-      );
+      return <MediaListSkeleton />;
     }
     if (isError) {
       return (
@@ -129,7 +128,7 @@ export default function SearchScreen() {
           <MediaCard
             item={item}
             onPress={() => openItem(item)}
-            right={<WatchlistButton item={item} />}
+            right={<WatchlistButton item={item} showCategorizedState />}
           />
         )}
       />

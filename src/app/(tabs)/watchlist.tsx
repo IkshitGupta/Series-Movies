@@ -10,6 +10,8 @@ import { DEFAULT_SORT, sortLibraryItems, type SortState } from '@/lib/sort';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import type { MediaItem } from '@/types';
 
+import { COLORS } from '@/theme/colors';
+
 function SegmentButton({
   label,
   active,
@@ -27,9 +29,9 @@ function SegmentButton({
         alignItems: 'center',
         borderRadius: 12,
         paddingVertical: 8,
-        backgroundColor: active ? '#ffffff' : 'transparent',
+        backgroundColor: active ? COLORS.white : 'transparent',
       }}>
-      <Text style={{ fontSize: 14, fontWeight: '600', color: active ? '#E50914' : '#6b7280' }}>
+      <Text style={{ fontSize: 14, fontWeight: '600', color: active ? COLORS.brand : COLORS.mutedDark }}>
         {label}
       </Text>
     </Pressable>

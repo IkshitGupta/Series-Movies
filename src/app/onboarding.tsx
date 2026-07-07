@@ -4,6 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { COLORS } from '@/theme/colors';
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function OnboardingScreen() {
         <View className="items-center gap-3">
           <View
             className="h-20 w-20 items-center justify-center rounded-3xl"
-            style={{ backgroundColor: '#E50914' }}>
+            style={{ backgroundColor: COLORS.brand }}>
             <Ionicons name="film" size={40} color="white" />
           </View>
           <Text className="text-center text-3xl font-bold text-neutral-900 dark:text-neutral-50">
@@ -43,7 +44,7 @@ export default function OnboardingScreen() {
           <Pressable
             onPress={() => router.push('/import')}
             className="flex-row items-center justify-center gap-2 rounded-2xl py-4 active:opacity-80"
-            style={{ backgroundColor: '#E50914' }}>
+            style={{ backgroundColor: COLORS.brand }}>
             <Ionicons name="cloud-upload-outline" size={20} color="white" />
             <Text className="text-base font-semibold text-white">Import data</Text>
           </Pressable>

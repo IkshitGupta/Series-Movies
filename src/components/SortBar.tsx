@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
 
+import { SelectChip } from '@/components/SelectChip';
 import { defaultDir, type SortKey, type SortState } from '@/lib/sort';
+import { COLORS } from '@/theme/colors';
 
 const OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'recent', label: 'Recent' },
@@ -30,28 +32,25 @@ export function SortBar({
 
   return (
     <View className="flex-row items-center gap-2">
-      <Ionicons name="swap-vertical" size={16} color="#9ca3af" />
+      <Ionicons name="swap-vertical" size={16} color={COLORS.muted} />
       {OPTIONS.map((opt) => {
         const active = opt.key === sort.key;
         return (
-          <Pressable
+          <SelectChip
             key={opt.key}
+            label={opt.label}
+            active={active}
             onPress={() => select(opt.key)}
-            className="flex-row items-center gap-1 rounded-full border border-neutral-300 px-3 py-1.5 active:opacity-70 dark:border-neutral-700"
-            style={active ? { backgroundColor: '#E50914', borderColor: '#E50914' } : undefined}>
-            <Text
-              className="text-xs font-semibold text-neutral-700 dark:text-neutral-200"
-              style={active ? { color: '#ffffff' } : undefined}>
-              {opt.label}
-            </Text>
-            {active ? (
-              <Ionicons
-                name={sort.dir === 'asc' ? 'arrow-up' : 'arrow-down'}
-                size={12}
-                color="#ffffff"
-              />
-            ) : null}
-          </Pressable>
+            trailing={
+              active ? (
+                <Ionicons
+                  name={sort.dir === 'asc' ? 'arrow-up' : 'arrow-down'}
+                  size={12}
+                  color={COLORS.white}
+                />
+              ) : null
+            }
+          />
         );
       })}
     </View>

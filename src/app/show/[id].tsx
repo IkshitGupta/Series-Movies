@@ -6,12 +6,17 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 
 import { queryKeys, useSeason, useShow } from '@/api/queries';
 import { getSeason } from '@/api/tmdb';
+import { Backdrop } from '@/components/Backdrop';
 import { EmptyState } from '@/components/EmptyState';
 import { EpisodeRow } from '@/components/EpisodeRow';
+import { CertBadge } from '@/components/CertBadge';
 import { Fact } from '@/components/Fact';
 import { PosterImage } from '@/components/PosterImage';
 import { ProgressBar } from '@/components/ProgressBar';
 import { RecommendationsRow } from '@/components/RecommendationsRow';
+import { SelectChip } from '@/components/SelectChip';
+import { DetailHeaderSkeleton } from '@/components/Skeleton';
+import { Tag } from '@/components/Tag';
 import { WatchlistButton } from '@/components/WatchlistButton';
 import { getUpcoming, airedEpisodeCount, upcomingLabel } from '@/lib/airing';
 import { tvToMediaItem } from '@/lib/normalize';
@@ -22,6 +27,8 @@ import {
   useTrackedShow,
 } from '@/store/useLibraryStore';
 import { episodeKey, type MediaItem, type ShowUserStatus } from '@/types';
+
+import { COLORS } from '@/theme/colors';
 
 const STATUS_OPTS: { key: ShowUserStatus; label: string }[] = [
   { key: 'stopped', label: 'Stopped watching' },
@@ -82,7 +89,7 @@ function SeasonEpisodes({
   if (isLoading) {
     return (
       <View className="items-center py-8">
-        <ActivityIndicator color="#E50914" />
+        <ActivityIndicator color={COLORS.brand} />
       </View>
     );
   }
@@ -174,10 +181,10 @@ export default function ShowDetailScreen() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-neutral-50 dark:bg-black">
+      <>
         <Stack.Screen options={{ title: 'Show' }} />
-        <ActivityIndicator color="#E50914" />
-      </View>
+        <DetailHeaderSkeleton />
+      </>
     );
   }
 
@@ -291,69 +298,53 @@ export default function ShowDetailScreen() {
       <ScrollView
         className="flex-1 bg-neutral-50 dark:bg-black"
         contentContainerStyle={{ paddingBottom: 40 }}>
-        <View className="flex-row gap-4 p-4">
-          <PosterImage path={show.poster_path} size="w342" className="h-48 w-32 rounded-2xl" />
-          <View className="flex-1 gap-2">
-            <Text className="text-xl font-bold text-neutral-900 dark:text-neutral-50">
-              {show.name}
-            </Text>
-            <View className="flex-row flex-wrap items-center gap-2">
-              <Text className="text-sm text-neutral-500 dark:text-neutral-400">
-                {[item.year, `${show.number_of_seasons} season${show.number_of_seasons === 1 ? '' : 's'}`]
-                  .filter(Boolean)
-                  .join('  •  ')}
+        <View className="relative overflow-hidden">
+          <Backdrop path={show.backdrop_path} />
+          <View className="flex-row gap-4 p-4">
+            <PosterImage path={show.poster_path} size="w342" className="h-48 w-32 rounded-2xl" />
+            <View className="flex-1 gap-2">
+              <Text className="text-xl font-bold text-neutral-900 dark:text-neutral-50">
+                {show.name}
               </Text>
-              {cert ? (
-                <View className="rounded border border-neutral-400 px-1 dark:border-neutral-600">
-                  <Text className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400">
-                    {cert}
-                  </Text>
-                </View>
-              ) : null}
-              {network ? (
-                <View className="flex-row items-center gap-1 rounded-full bg-neutral-200 px-2 py-0.5 dark:bg-neutral-800">
-                  <Ionicons name="tv-outline" size={11} color="#9ca3af" />
-                  <Text className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">
-                    {network}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-            {show.tagline ? (
-              <Text className="text-sm italic text-neutral-500 dark:text-neutral-400">
-                {show.tagline}
-              </Text>
-            ) : null}
-            {show.vote_average ? (
-              <View className="flex-row items-center gap-1">
-                <Ionicons name="star" size={14} color="#f5c518" />
-                <Text className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
-                  {show.vote_average.toFixed(1)}
+              <View className="flex-row flex-wrap items-center gap-2">
+                <Text className="text-sm text-neutral-500 dark:text-neutral-400">
+                  {[item.year, `${show.number_of_seasons} season${show.number_of_seasons === 1 ? '' : 's'}`]
+                    .filter(Boolean)
+                    .join('  •  ')}
                 </Text>
+                {cert ? <CertBadge value={cert} /> : null}
+                {network ? <Tag label={network} icon="tv-outline" /> : null}
               </View>
-            ) : null}
-            {show.genres.length > 0 ? (
-              <View className="flex-row flex-wrap gap-1">
-                {show.genres.map((g) => (
-                  <View
-                    key={g.id}
-                    className="rounded-full bg-neutral-200 px-2 py-0.5 dark:bg-neutral-800">
-                    <Text className="text-[11px] text-neutral-600 dark:text-neutral-300">
-                      {g.name}
-                    </Text>
-                  </View>
-                ))}
+              {show.tagline ? (
+                <Text className="text-sm italic text-neutral-500 dark:text-neutral-400">
+                  {show.tagline}
+                </Text>
+              ) : null}
+              {show.vote_average ? (
+                <View className="flex-row items-center gap-1">
+                  <Ionicons name="star" size={14} color={COLORS.gold} />
+                  <Text className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
+                    {show.vote_average.toFixed(1)}
+                  </Text>
+                </View>
+              ) : null}
+              {show.genres.length > 0 ? (
+                <View className="flex-row flex-wrap gap-1">
+                  {show.genres.map((g) => (
+                    <Tag key={g.id} label={g.name} />
+                  ))}
+                </View>
+              ) : null}
+              <View className="flex-row items-center">
+                <WatchlistButton item={item} />
               </View>
-            ) : null}
-            <View className="flex-row items-center">
-              <WatchlistButton item={item} />
             </View>
           </View>
         </View>
 
         {upcoming ? (
           <View className="mx-4 mb-1 flex-row items-center gap-2 rounded-xl bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
-            <Ionicons name="calendar-outline" size={16} color="#E50914" />
+            <Ionicons name="calendar-outline" size={16} color={COLORS.brand} />
             <Text className="text-sm font-semibold text-brand">{upcomingLabel(upcoming)}</Text>
           </View>
         ) : null}
@@ -373,9 +364,9 @@ export default function ShowDetailScreen() {
             disabled={busy !== null}
             className="mt-1 flex-row items-center justify-center gap-2 rounded-xl bg-neutral-200 py-2 active:opacity-70 dark:bg-neutral-800">
             {busy === 'series' ? (
-              <ActivityIndicator size="small" color="#E50914" />
+              <ActivityIndicator size="small" color={COLORS.brand} />
             ) : (
-              <Ionicons name="checkmark-done" size={16} color="#E50914" />
+              <Ionicons name="checkmark-done" size={16} color={COLORS.brand} />
             )}
             <Text className="text-sm font-semibold text-brand">
               {status === 'completed' ? 'Whole series watched' : 'Mark whole series watched'}
@@ -392,17 +383,12 @@ export default function ShowDetailScreen() {
               {STATUS_OPTS.map((opt) => {
                 const active = userStatus === opt.key;
                 return (
-                  <Pressable
+                  <SelectChip
                     key={opt.key}
+                    label={opt.label}
+                    active={active}
                     onPress={() => setShowStatus(item, total, active ? null : opt.key)}
-                    className="rounded-full border border-neutral-300 px-3 py-1.5 dark:border-neutral-700"
-                    style={active ? { backgroundColor: '#E50914', borderColor: '#E50914' } : undefined}>
-                    <Text
-                      className="text-xs font-semibold text-neutral-700 dark:text-neutral-200"
-                      style={active ? { color: '#ffffff' } : undefined}>
-                      {opt.label}
-                    </Text>
-                  </Pressable>
+                  />
                 );
               })}
             </View>
@@ -434,17 +420,14 @@ export default function ShowDetailScreen() {
             {seasons.map((s) => {
               const active = s.season_number === activeSeason;
               return (
-                <Pressable
+                <SelectChip
                   key={s.id}
+                  label={`Season ${s.season_number}`}
+                  active={active}
+                  variant="filled"
+                  size="md"
                   onPress={() => setSelectedSeason(s.season_number)}
-                  className="rounded-full bg-neutral-200 px-4 py-2 dark:bg-neutral-800"
-                  style={active ? { backgroundColor: '#E50914' } : undefined}>
-                  <Text
-                    className="text-sm font-semibold text-neutral-700 dark:text-neutral-200"
-                    style={active ? { color: '#ffffff' } : undefined}>
-                    Season {s.season_number}
-                  </Text>
-                </Pressable>
+                />
               );
             })}
           </ScrollView>

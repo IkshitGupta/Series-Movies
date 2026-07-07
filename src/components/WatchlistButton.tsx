@@ -1,25 +1,43 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { useIsCategorized, useIsInWatchlist, useLibraryStore } from '@/store/useLibraryStore';
 import type { MediaItem } from '@/types';
 
+import { COLORS } from '@/theme/colors';
+
 interface WatchlistButtonProps {
   item: MediaItem;
   size?: number;
+  /**
+   * When the item is already in the library (watched/tracked), show a muted
+   * "in library" marker instead of rendering nothing — keeps list rows aligned
+   * and signals you've already seen it. Off by default (detail screens hide it).
+   */
+  showCategorizedState?: boolean;
 }
 
 /**
  * Bookmark toggle that adds/removes an item from the single watchlist.
- * Renders nothing once the item is already watched/tracked/categorized.
+ * Renders nothing once the item is already watched/tracked/categorized (unless
+ * {@link WatchlistButtonProps.showCategorizedState} is set).
  */
-export function WatchlistButton({ item, size = 26 }: WatchlistButtonProps) {
+export function WatchlistButton({ item, size = 26, showCategorizedState = false }: WatchlistButtonProps) {
   const inList = useIsInWatchlist(item.mediaType, item.id);
   const categorized = useIsCategorized(item.mediaType, item.id);
   const addToWatchlist = useLibraryStore((s) => s.addToWatchlist);
   const removeFromWatchlist = useLibraryStore((s) => s.removeFromWatchlist);
 
-  if (categorized) return null;
+  if (categorized) {
+    if (!showCategorizedState) return null;
+    return (
+      <View
+        accessibilityLabel="Already in your library"
+        className="h-10 w-10 items-center justify-center">
+        <Ionicons name="checkmark-circle" size={size} color={COLORS.muted} />
+      </View>
+    );
+  }
 
   return (
     <Pressable
@@ -31,7 +49,7 @@ export function WatchlistButton({ item, size = 26 }: WatchlistButtonProps) {
       <Ionicons
         name={inList ? 'bookmark' : 'bookmark-outline'}
         size={size}
-        color={inList ? '#E50914' : '#9ca3af'}
+        color={inList ? COLORS.brand : COLORS.muted}
       />
     </Pressable>
   );

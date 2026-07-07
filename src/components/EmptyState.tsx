@@ -2,6 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { type ComponentProps } from 'react';
 import { Text, View } from 'react-native';
 
+import { COLORS } from '@/theme/colors';
+
 interface EmptyStateProps {
   icon?: ComponentProps<typeof Ionicons>['name'];
   title: string;
@@ -11,7 +13,7 @@ interface EmptyStateProps {
 export function EmptyState({ icon = 'film-outline', title, message }: EmptyStateProps) {
   return (
     <View className="flex-1 items-center justify-center gap-3 px-8 py-16">
-      <Ionicons name={icon} size={48} color="#9ca3af" />
+      <Ionicons name={icon} size={48} color={COLORS.muted} />
       <Text className="text-center text-lg font-semibold text-neutral-800 dark:text-neutral-100">
         {title}
       </Text>

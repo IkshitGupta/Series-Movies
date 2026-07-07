@@ -4,6 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import type { MediaItem } from '@/types';
 
+import { COLORS } from '@/theme/colors';
 import { PosterImage } from './PosterImage';
 import { StatusBadge } from './StatusBadge';
 
@@ -22,7 +23,7 @@ export function MediaCard({ item, onPress, right, subtitle, badge }: MediaCardPr
   return (
     <Pressable
       onPress={onPress}
-      className="flex-row items-center gap-3 rounded-2xl bg-white p-2 active:opacity-70 dark:bg-neutral-900">
+      className="flex-row items-center gap-3 rounded-2xl border border-neutral-100 bg-white p-2 active:opacity-70 dark:border-neutral-800 dark:bg-neutral-900">
       <PosterImage path={item.posterPath} size="w185" className="h-24 w-16 rounded-xl" />
 
       <View className="flex-1 gap-1">
@@ -47,7 +48,7 @@ export function MediaCard({ item, onPress, right, subtitle, badge }: MediaCardPr
         ) : null}
         {badge ? (
           <View className="flex-row items-center gap-1">
-            <Ionicons name="calendar-outline" size={12} color="#E50914" />
+            <Ionicons name="calendar-outline" size={12} color={COLORS.brand} />
             <Text numberOfLines={1} className="text-xs font-semibold text-brand">
               {badge}
             </Text>

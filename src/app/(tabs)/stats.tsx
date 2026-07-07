@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { type ComponentProps, useMemo } from 'react';
+import { type ComponentProps, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { EmptyState } from '@/components/EmptyState';
@@ -13,6 +13,8 @@ import {
   useLibraryStore,
 } from '@/store/useLibraryStore';
 
+import { COLORS } from '@/theme/colors';
+
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function GenreBreakdown({
@@ -23,6 +25,8 @@ function GenreBreakdown({
   mediaType: 'movie' | 'tv';
 }) {
   const router = useRouter();
+  const [expanded, setExpanded] = useState(false);
+  const COLLAPSED_COUNT = 6;
 
   if (genres.length === 0) {
     return (
@@ -32,9 +36,11 @@ function GenreBreakdown({
     );
   }
   const max = genres[0].count;
+  const visible = expanded ? genres : genres.slice(0, COLLAPSED_COUNT);
+  const hasMore = genres.length > COLLAPSED_COUNT;
   return (
     <View className="gap-3">
-      {genres.map((g) => (
+      {visible.map((g) => (
         <Pressable
           key={g.genre}
           onPress={() =>
@@ -44,7 +50,7 @@ function GenreBreakdown({
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-1">
               <Text className="text-sm text-neutral-700 dark:text-neutral-200">{g.genre}</Text>
-              <Ionicons name="chevron-forward" size={13} color="#9ca3af" />
+              <Ionicons name="chevron-forward" size={13} color={COLORS.muted} />
             </View>
             <Text className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">
               {g.count}
@@ -53,6 +59,21 @@ function GenreBreakdown({
           <ProgressBar value={max ? g.count / max : 0} />
         </Pressable>
       ))}
+      {hasMore ? (
+        <Pressable
+          onPress={() => setExpanded((v) => !v)}
+          accessibilityRole="button"
+          className="flex-row items-center justify-center gap-1 pt-1 active:opacity-60">
+          <Text className="text-sm font-semibold text-brand">
+            {expanded ? 'Show less' : `Show all ${genres.length}`}
+          </Text>
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={14}
+            color={COLORS.brand}
+          />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -73,9 +94,9 @@ function StatsSection({
   mediaType: 'movie' | 'tv';
 }) {
   return (
-    <View className="gap-3 rounded-2xl bg-white p-4 dark:bg-neutral-900">
+    <View className="gap-3 rounded-2xl border border-neutral-100 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
       <View className="flex-row items-center gap-2">
-        <Ionicons name={icon} size={18} color="#E50914" />
+        <Ionicons name={icon} size={18} color={COLORS.brand} />
         <Text className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
           {title}
         </Text>
@@ -85,7 +106,7 @@ function StatsSection({
         <Text className="text-sm text-neutral-500 dark:text-neutral-400">{sub}</Text>
       </View>
       <View className="flex-row items-center gap-1.5">
-        <Ionicons name="time-outline" size={15} color="#9ca3af" />
+        <Ionicons name="time-outline" size={15} color={COLORS.muted} />
         <Text className="text-sm text-neutral-600 dark:text-neutral-300">
           {formatWatchTime(stats.runtimeMinutes)} of watch time
         </Text>

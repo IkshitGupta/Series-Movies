@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, TextInput, View } from 'react-native';
 
+import { COLORS } from '@/theme/colors';
+
 interface SearchBarProps {
   value: string;
   onChangeText: (text: string) => void;
@@ -14,12 +16,12 @@ export function SearchBar({
 }: SearchBarProps) {
   return (
     <View className="flex-row items-center gap-2 rounded-2xl bg-neutral-100 px-3 dark:bg-neutral-800">
-      <Ionicons name="search" size={18} color="#9ca3af" />
+      <Ionicons name="search" size={18} color={COLORS.muted} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="#9ca3af"
+        placeholderTextColor={COLORS.muted}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
@@ -27,7 +29,7 @@ export function SearchBar({
       />
       {value.length > 0 ? (
         <Pressable onPress={() => onChangeText('')} hitSlop={8}>
-          <Ionicons name="close-circle" size={18} color="#9ca3af" />
+          <Ionicons name="close-circle" size={18} color={COLORS.muted} />
         </Pressable>
       ) : null}
     </View>

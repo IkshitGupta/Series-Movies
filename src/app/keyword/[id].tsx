@@ -1,9 +1,10 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 
 import { useDiscoverByKeyword } from '@/api/queries';
 import { EmptyState } from '@/components/EmptyState';
 import { MediaCard } from '@/components/MediaCard';
+import { MediaListSkeleton } from '@/components/Skeleton';
 import { WatchlistButton } from '@/components/WatchlistButton';
 import type { MediaItem } from '@/types';
 
@@ -25,11 +26,7 @@ export default function KeywordScreen() {
 
   const renderBody = () => {
     if (isLoading) {
-      return (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#E50914" />
-        </View>
-      );
+      return <MediaListSkeleton />;
     }
     if (isError) {
       return (
@@ -58,7 +55,7 @@ export default function KeywordScreen() {
           <MediaCard
             item={item}
             onPress={() => openItem(item)}
-            right={<WatchlistButton item={item} />}
+            right={<WatchlistButton item={item} showCategorizedState />}
           />
         )}
       />

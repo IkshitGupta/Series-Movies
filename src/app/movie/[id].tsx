@@ -2,19 +2,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useMovie } from '@/api/queries';
+import { Backdrop } from '@/components/Backdrop';
 import { EmptyState } from '@/components/EmptyState';
+import { CertBadge } from '@/components/CertBadge';
 import { Fact } from '@/components/Fact';
 import { PosterImage } from '@/components/PosterImage';
 import { RecommendationsRow } from '@/components/RecommendationsRow';
+import { DetailHeaderSkeleton } from '@/components/Skeleton';
+import { Tag } from '@/components/Tag';
 import { WatchlistButton } from '@/components/WatchlistButton';
 import { movieToMediaItem } from '@/lib/normalize';
 import { getMovieCertification, normalizeRecommendations } from '@/lib/tmdbExtras';
 import { profileUrl } from '@/lib/tmdbImage';
 import { useIsMovieWatched, useLibraryStore } from '@/store/useLibraryStore';
 import type { MediaItem } from '@/types';
+
+import { COLORS } from '@/theme/colors';
 
 function formatRuntime(min: number | null): string | null {
   if (!min) return null;
@@ -41,10 +47,10 @@ export default function MovieDetailScreen() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-neutral-50 dark:bg-black">
+      <>
         <Stack.Screen options={{ title: 'Movie' }} />
-        <ActivityIndicator color="#E50914" />
-      </View>
+        <DetailHeaderSkeleton />
+      </>
     );
   }
 
@@ -83,45 +89,38 @@ export default function MovieDetailScreen() {
       <ScrollView
         className="flex-1 bg-neutral-50 dark:bg-black"
         contentContainerStyle={{ paddingBottom: 40 }}>
-        <View className="flex-row gap-4 p-4">
-          <PosterImage path={movie.poster_path} size="w342" className="h-48 w-32 rounded-2xl" />
-          <View className="flex-1 gap-2">
-            <Text className="text-xl font-bold text-neutral-900 dark:text-neutral-50">
-              {movie.title}
-            </Text>
-            <View className="flex-row flex-wrap items-center gap-2">
-              <Text className="text-sm text-neutral-500 dark:text-neutral-400">
-                {[item.year, runtime].filter(Boolean).join('  •  ')}
+        <View className="relative overflow-hidden">
+          <Backdrop path={movie.backdrop_path} />
+          <View className="flex-row gap-4 p-4">
+            <PosterImage path={movie.poster_path} size="w342" className="h-48 w-32 rounded-2xl" />
+            <View className="flex-1 gap-2">
+              <Text className="text-xl font-bold text-neutral-900 dark:text-neutral-50">
+                {movie.title}
               </Text>
-              {cert ? (
-                <View className="rounded border border-neutral-400 px-1 dark:border-neutral-600">
-                  <Text className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400">
-                    {cert}
+              <View className="flex-row flex-wrap items-center gap-2">
+                <Text className="text-sm text-neutral-500 dark:text-neutral-400">
+                  {[item.year, runtime].filter(Boolean).join('  •  ')}
+                </Text>
+                {cert ? <CertBadge value={cert} /> : null}
+              </View>
+              {movie.tagline ? (
+                <Text className="text-sm italic text-neutral-500 dark:text-neutral-400">
+                  {movie.tagline}
+                </Text>
+              ) : null}
+              {movie.vote_average ? (
+                <View className="flex-row items-center gap-1">
+                  <Ionicons name="star" size={14} color={COLORS.gold} />
+                  <Text className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
+                    {movie.vote_average.toFixed(1)}
                   </Text>
                 </View>
               ) : null}
-            </View>
-            {movie.tagline ? (
-              <Text className="text-sm italic text-neutral-500 dark:text-neutral-400">
-                {movie.tagline}
-              </Text>
-            ) : null}
-            {movie.vote_average ? (
-              <View className="flex-row items-center gap-1">
-                <Ionicons name="star" size={14} color="#f5c518" />
-                <Text className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
-                  {movie.vote_average.toFixed(1)}
-                </Text>
+              <View className="flex-row flex-wrap gap-1">
+                {movie.genres.map((g) => (
+                  <Tag key={g.id} label={g.name} />
+                ))}
               </View>
-            ) : null}
-            <View className="flex-row flex-wrap gap-1">
-              {movie.genres.map((g) => (
-                <View
-                  key={g.id}
-                  className="rounded-full bg-neutral-200 px-2 py-0.5 dark:bg-neutral-800">
-                  <Text className="text-[11px] text-neutral-600 dark:text-neutral-300">{g.name}</Text>
-                </View>
-              ))}
             </View>
           </View>
         </View>
@@ -130,7 +129,7 @@ export default function MovieDetailScreen() {
           <Pressable
             onPress={() => (watched ? unmark(movieId) : markWatched(item))}
             className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl py-3 active:opacity-80"
-            style={{ backgroundColor: watched ? '#16a34a' : '#E50914' }}>
+            style={{ backgroundColor: watched ? COLORS.success : COLORS.brand }}>
             <Ionicons
               name={watched ? 'checkmark-circle' : 'add-circle-outline'}
               size={20}
@@ -185,7 +184,7 @@ export default function MovieDetailScreen() {
                           style={{ width: '100%', height: '100%' }}
                         />
                       ) : (
-                        <Ionicons name="person" size={24} color="#9ca3af" />
+                        <Ionicons name="person" size={24} color={COLORS.muted} />
                       )}
                     </View>
                     <Text

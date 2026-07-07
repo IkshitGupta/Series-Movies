@@ -7,6 +7,7 @@ import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, Text, View }
 import { useShow } from '@/api/queries';
 import { EmptyState } from '@/components/EmptyState';
 import { MediaCard } from '@/components/MediaCard';
+import { SelectChip } from '@/components/SelectChip';
 import { SortBar } from '@/components/SortBar';
 import { StatusBadge } from '@/components/StatusBadge';
 import { airedEpisodeCount, getUpcoming, upcomingLabel } from '@/lib/airing';
@@ -14,6 +15,8 @@ import { findNextEpisode } from '@/lib/nextEpisode';
 import { DEFAULT_SORT, sortLibraryItems, type SortState } from '@/lib/sort';
 import { getShowProgress, getShowStatus, useLibraryStore } from '@/store/useLibraryStore';
 import type { MediaItem, ShowStatus, ShowUserStatus, TrackedShow } from '@/types';
+
+import { COLORS } from '@/theme/colors';
 
 const STATUS_LABEL: Record<ShowStatus, string> = {
   not_started: 'Not started',
@@ -68,12 +71,12 @@ function MarkNextButton({ busy, onPress }: { busy: boolean; onPress: () => void 
       disabled={busy}
       hitSlop={8}
       className="flex-row items-center gap-1 rounded-full px-3 py-2 active:opacity-80"
-      style={{ backgroundColor: '#E50914', opacity: busy ? 0.6 : 1 }}>
+      style={{ backgroundColor: COLORS.brand, opacity: busy ? 0.6 : 1 }}>
       {busy ? (
-        <ActivityIndicator size="small" color="#ffffff" />
+        <ActivityIndicator size="small" color={COLORS.white} />
       ) : (
         <>
-          <Ionicons name="play-forward" size={14} color="#ffffff" />
+          <Ionicons name="play-forward" size={14} color={COLORS.white} />
           <Text className="text-xs font-semibold text-white">Next</Text>
         </>
       )}
@@ -203,28 +206,13 @@ export default function SeriesScreen() {
         {TV_FILTERS.map((f) => {
           const active = tvFilter === f.key;
           return (
-            <Pressable
+            <SelectChip
               key={f.key}
+              label={`${f.label} (${tvGroups[f.key].length})`}
+              active={active}
+              scrollFix
               onPress={() => setTvFilter(f.key)}
-              className="flex-row items-center rounded-full border border-neutral-300 px-3 py-1.5 dark:border-neutral-700"
-              style={active ? { backgroundColor: '#E50914', borderColor: '#E50914' } : undefined}>
-              <Text
-                className="text-xs font-semibold text-neutral-700 dark:text-neutral-200"
-                // Inside a horizontal ScrollView, Android caps the text line box and
-                // clips descenders; lineHeight restores room, and the small translateY
-                // re-centers the glyph (Android adds line-height leading above the text).
-                style={[
-                  {
-                    lineHeight: 24,
-                    includeFontPadding: false,
-                    textAlignVertical: 'center',
-                    transform: [{ translateY: -4 }],
-                  },
-                  active ? { color: '#ffffff' } : null,
-                ]}>
-                {f.label} ({tvGroups[f.key].length})
-              </Text>
-            </Pressable>
+            />
           );
         })}
       </ScrollView>

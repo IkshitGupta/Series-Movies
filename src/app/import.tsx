@@ -15,6 +15,8 @@ import {
 } from '@/lib/tvtimeImport';
 import { useLibraryStore } from '@/store/useLibraryStore';
 
+import { COLORS } from '@/theme/colors';
+
 type Phase = 'idle' | 'working' | 'done' | 'error';
 
 const PHASE_LABELS: Record<string, string> = {
@@ -106,7 +108,7 @@ export default function ImportScreen() {
     const pct = progress && progress.total > 0 ? progress.processed / progress.total : 0;
     return (
       <View className="flex-1 items-center justify-center gap-5 bg-neutral-50 px-8 dark:bg-black">
-        <ActivityIndicator size="large" color="#E50914" />
+        <ActivityIndicator size="large" color={COLORS.brand} />
         <Text className="text-center text-lg font-semibold text-neutral-900 dark:text-neutral-50">
           {PHASE_LABELS[step] ?? 'Working…'}
         </Text>
@@ -115,7 +117,7 @@ export default function ImportScreen() {
             <View className="h-2 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
               <View
                 className="h-2 rounded-full"
-                style={{ width: `${Math.round(pct * 100)}%`, backgroundColor: '#E50914' }}
+                style={{ width: `${Math.round(pct * 100)}%`, backgroundColor: COLORS.brand }}
               />
             </View>
             <Text className="text-center text-sm text-neutral-500 dark:text-neutral-400">
@@ -142,7 +144,7 @@ export default function ImportScreen() {
         className="flex-1 bg-neutral-50 dark:bg-black"
         contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 40 }}>
         <View className="items-center gap-2">
-          <Ionicons name="checkmark-circle" size={56} color="#16a34a" />
+          <Ionicons name="checkmark-circle" size={56} color={COLORS.success} />
           <Text className="text-center text-2xl font-bold text-neutral-900 dark:text-neutral-50">
             Import complete
           </Text>
@@ -162,7 +164,7 @@ export default function ImportScreen() {
         </View>
 
         {unmatchedCount > 0 ? (
-          <View className="gap-3 rounded-2xl bg-white p-4 dark:bg-neutral-900">
+          <View className="gap-3 rounded-2xl border border-neutral-100 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
             <Text className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
               Couldn&apos;t be imported ({unmatchedCount})
             </Text>
@@ -180,7 +182,7 @@ export default function ImportScreen() {
             <Pressable
               onPress={downloadReport}
               className="mt-1 flex-row items-center justify-center gap-2 rounded-2xl bg-neutral-200 py-3 active:opacity-80 dark:bg-neutral-800">
-              <Ionicons name="download-outline" size={18} color="#E50914" />
+              <Ionicons name="download-outline" size={18} color={COLORS.brand} />
               <Text className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">
                 Download report (CSV)
               </Text>
@@ -191,7 +193,7 @@ export default function ImportScreen() {
         <Pressable
           onPress={finish}
           className="items-center justify-center rounded-2xl py-4 active:opacity-80"
-          style={{ backgroundColor: '#E50914' }}>
+          style={{ backgroundColor: COLORS.brand }}>
           <Text className="text-base font-semibold text-white">Done</Text>
         </Pressable>
       </ScrollView>
@@ -202,7 +204,7 @@ export default function ImportScreen() {
   if (phase === 'error') {
     return (
       <View className="flex-1 items-center justify-center gap-5 bg-neutral-50 px-8 dark:bg-black">
-        <Ionicons name="alert-circle-outline" size={56} color="#E50914" />
+        <Ionicons name="alert-circle-outline" size={56} color={COLORS.brand} />
         <Text className="text-center text-lg font-semibold text-neutral-900 dark:text-neutral-50">
           Import failed
         </Text>
@@ -212,7 +214,7 @@ export default function ImportScreen() {
         <Pressable
           onPress={() => setPhase('idle')}
           className="items-center justify-center rounded-2xl px-8 py-3 active:opacity-80"
-          style={{ backgroundColor: '#E50914' }}>
+          style={{ backgroundColor: COLORS.brand }}>
           <Text className="text-base font-semibold text-white">Try again</Text>
         </Pressable>
       </View>
@@ -227,7 +229,7 @@ export default function ImportScreen() {
       <View className="items-center gap-3 pt-4">
         <View
           className="h-16 w-16 items-center justify-center rounded-3xl"
-          style={{ backgroundColor: '#E50914' }}>
+          style={{ backgroundColor: COLORS.brand }}>
           <Ionicons name="cloud-upload-outline" size={32} color="white" />
         </View>
         <Text className="text-center text-2xl font-bold text-neutral-900 dark:text-neutral-50">
@@ -240,7 +242,7 @@ export default function ImportScreen() {
         </Text>
       </View>
 
-      <View className="gap-2 rounded-2xl bg-white p-4 dark:bg-neutral-900">
+      <View className="gap-2 rounded-2xl border border-neutral-100 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
         <Text className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">
           About the file
         </Text>
@@ -253,7 +255,7 @@ export default function ImportScreen() {
       <Pressable
         onPress={pickAndImport}
         className="flex-row items-center justify-center gap-2 rounded-2xl py-4 active:opacity-80"
-        style={{ backgroundColor: '#E50914' }}>
+        style={{ backgroundColor: COLORS.brand }}>
         <Ionicons name="document-attach-outline" size={20} color="white" />
         <Text className="text-base font-semibold text-white">Choose ZIP file</Text>
       </Pressable>

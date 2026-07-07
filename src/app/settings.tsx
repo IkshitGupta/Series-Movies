@@ -9,6 +9,8 @@ import { buildExportZip, isLibraryEmpty } from '@/lib/libraryBackup';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import type { ThemePref } from '@/types';
 
+import { COLORS } from '@/theme/colors';
+
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const THEME_OPTIONS: { key: ThemePref; label: string; icon: IoniconName }[] = [
@@ -34,21 +36,21 @@ function SettingsRow({
     <Pressable
       onPress={onPress}
       disabled={busy}
-      className="flex-row items-center gap-3 rounded-2xl bg-white p-4 active:opacity-80 dark:bg-neutral-900"
+      className="flex-row items-center gap-3 rounded-2xl border border-neutral-100 bg-white p-4 active:opacity-80 dark:border-neutral-800 dark:bg-neutral-900"
       style={{ opacity: busy ? 0.6 : 1 }}>
       <View
         className="h-10 w-10 items-center justify-center rounded-full"
-        style={{ backgroundColor: '#E5091420' }}>
-        <Ionicons name={icon} size={20} color="#E50914" />
+        style={{ backgroundColor: COLORS.brandTint }}>
+        <Ionicons name={icon} size={20} color={COLORS.brand} />
       </View>
       <View className="flex-1">
         <Text className="text-base font-semibold text-neutral-900 dark:text-neutral-50">{title}</Text>
         <Text className="text-xs text-neutral-500 dark:text-neutral-400">{subtitle}</Text>
       </View>
       {busy ? (
-        <ActivityIndicator size="small" color="#E50914" />
+        <ActivityIndicator size="small" color={COLORS.brand} />
       ) : (
-        <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
+        <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />
       )}
     </Pressable>
   );
@@ -107,11 +109,11 @@ export default function SettingsScreen() {
                 key={opt.key}
                 onPress={() => setTheme(opt.key)}
                 className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 active:opacity-80"
-                style={{ backgroundColor: active ? '#E50914' : 'transparent' }}>
-                <Ionicons name={opt.icon} size={16} color={active ? '#ffffff' : '#6b7280'} />
+                style={{ backgroundColor: active ? COLORS.brand : 'transparent' }}>
+                <Ionicons name={opt.icon} size={16} color={active ? COLORS.white : COLORS.mutedDark} />
                 <Text
                   className="text-sm font-semibold"
-                  style={{ color: active ? '#ffffff' : '#6b7280' }}>
+                  style={{ color: active ? COLORS.white : COLORS.mutedDark }}>
                   {opt.label}
                 </Text>
               </Pressable>

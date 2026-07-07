@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { stillUrl } from '@/lib/tmdbImage';
+import { COLORS } from '@/theme/colors';
 
 interface EpisodeRowProps {
   episodeNumber: number;
@@ -70,9 +71,9 @@ export const EpisodeRow = memo(function EpisodeRow({
           accessibilityLabel="Mark watched up to here"
           className="p-1 active:opacity-60">
           {busy ? (
-            <ActivityIndicator size="small" color="#9ca3af" />
+            <ActivityIndicator size="small" color={COLORS.muted} />
           ) : (
-            <Ionicons name="arrow-up-circle-outline" size={22} color="#9ca3af" />
+            <Ionicons name="arrow-up-circle-outline" size={22} color={COLORS.muted} />
           )}
         </Pressable>
       ) : null}
@@ -81,7 +82,7 @@ export const EpisodeRow = memo(function EpisodeRow({
         <Ionicons
           name={watched ? 'checkmark-circle' : 'ellipse-outline'}
           size={26}
-          color={watched ? '#E50914' : '#9ca3af'}
+          color={watched ? COLORS.brand : COLORS.muted}
         />
       </Pressable>
     </View>

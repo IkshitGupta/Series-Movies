@@ -10,6 +10,8 @@ import { DEFAULT_SORT, sortLibraryItems, type SortState } from '@/lib/sort';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import type { MediaItem } from '@/types';
 
+import { COLORS } from '@/theme/colors';
+
 function UnwatchButton({ id }: { id: number }) {
   const unmark = useLibraryStore((s) => s.unmarkMovieWatched);
   return (
@@ -18,7 +20,7 @@ function UnwatchButton({ id }: { id: number }) {
       accessibilityLabel="Mark as not watched"
       onPress={() => unmark(id)}
       className="h-10 w-10 items-center justify-center active:opacity-60">
-      <Ionicons name="checkmark-circle" size={26} color="#16a34a" />
+      <Ionicons name="checkmark-circle" size={26} color={COLORS.success} />
     </Pressable>
   );
 }

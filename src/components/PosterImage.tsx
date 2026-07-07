@@ -1,7 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { posterUrl, type PosterSize } from '@/lib/tmdbImage';
+import { COLORS } from '@/theme/colors';
 
 interface PosterImageProps {
   path: string | null;
@@ -31,10 +33,8 @@ export function PosterImage({ path, size = 'w342', className }: PosterImageProps
           style={{ width: '100%', height: '100%' }}
         />
       ) : (
-        <View className="h-full w-full items-center justify-center px-1">
-          <Text className="text-center text-[10px] text-neutral-500 dark:text-neutral-400">
-            No poster
-          </Text>
+        <View className="h-full w-full items-center justify-center">
+          <Ionicons name="film-outline" size={30} color={COLORS.muted} />
         </View>
       )}
     </View>
