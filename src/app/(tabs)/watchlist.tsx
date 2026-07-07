@@ -4,7 +4,9 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { EmptyState } from '@/components/EmptyState';
 import { MediaCard } from '@/components/MediaCard';
+import { SortBar } from '@/components/SortBar';
 import { WatchlistButton } from '@/components/WatchlistButton';
+import { DEFAULT_SORT, sortLibraryItems, type SortState } from '@/lib/sort';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import type { MediaItem } from '@/types';
 
@@ -38,9 +40,16 @@ export default function WatchlistScreen() {
   const router = useRouter();
   const watchlist = useLibraryStore((s) => s.watchlist);
   const [tab, setTab] = useState<'movies' | 'tv'>('movies');
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
 
-  const movies = useMemo(() => watchlist.filter((w) => w.mediaType === 'movie'), [watchlist]);
-  const shows = useMemo(() => watchlist.filter((w) => w.mediaType === 'tv'), [watchlist]);
+  const movies = useMemo(
+    () => sortLibraryItems(watchlist.filter((w) => w.mediaType === 'movie'), sort, (w) => w.addedAt),
+    [watchlist, sort],
+  );
+  const shows = useMemo(
+    () => sortLibraryItems(watchlist.filter((w) => w.mediaType === 'tv'), sort, (w) => w.addedAt),
+    [watchlist, sort],
+  );
   const data = tab === 'movies' ? movies : shows;
 
   const openItem = (item: MediaItem) => {
@@ -76,6 +85,10 @@ export default function WatchlistScreen() {
           active={tab === 'tv'}
           onPress={() => setTab('tv')}
         />
+      </View>
+
+      <View className="px-4 pb-1 pt-3">
+        <SortBar sort={sort} onChange={setSort} />
       </View>
 
       {data.length === 0 ? (

@@ -7,9 +7,11 @@ import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, Text, View }
 import { useShow } from '@/api/queries';
 import { EmptyState } from '@/components/EmptyState';
 import { MediaCard } from '@/components/MediaCard';
+import { SortBar } from '@/components/SortBar';
 import { StatusBadge } from '@/components/StatusBadge';
 import { airedEpisodeCount, getUpcoming, upcomingLabel } from '@/lib/airing';
 import { findNextEpisode } from '@/lib/nextEpisode';
+import { DEFAULT_SORT, sortLibraryItems, type SortState } from '@/lib/sort';
 import { getShowProgress, getShowStatus, useLibraryStore } from '@/store/useLibraryStore';
 import type { MediaItem, ShowStatus, ShowUserStatus, TrackedShow } from '@/types';
 
@@ -140,10 +142,11 @@ export default function SeriesScreen() {
   const toggleEpisode = useLibraryStore((s) => s.toggleEpisode);
   const setShowEpisodeRuntime = useLibraryStore((s) => s.setShowEpisodeRuntime);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
 
   const shows = useMemo(
-    () => Object.values(trackedShows).sort((a, b) => b.lastUpdated - a.lastUpdated),
-    [trackedShows],
+    () => sortLibraryItems(Object.values(trackedShows), sort, (s) => s.lastUpdated),
+    [trackedShows, sort],
   );
 
   const [tvFilter, setTvFilter] = useState<TvFilter>('watching');
@@ -191,24 +194,44 @@ export default function SeriesScreen() {
         horizontal
         showsHorizontalScrollIndicator={false}
         style={{ flexGrow: 0 }}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingVertical: 12 }}>
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          gap: 8,
+          paddingVertical: 12,
+          alignItems: 'center',
+        }}>
         {TV_FILTERS.map((f) => {
           const active = tvFilter === f.key;
           return (
             <Pressable
               key={f.key}
               onPress={() => setTvFilter(f.key)}
-              className="self-start rounded-full border border-neutral-300 px-3 py-1.5 dark:border-neutral-700"
+              className="flex-row items-center rounded-full border border-neutral-300 px-3 py-1.5 dark:border-neutral-700"
               style={active ? { backgroundColor: '#E50914', borderColor: '#E50914' } : undefined}>
               <Text
                 className="text-xs font-semibold text-neutral-700 dark:text-neutral-200"
-                style={active ? { color: '#ffffff' } : undefined}>
+                // Inside a horizontal ScrollView, Android caps the text line box and
+                // clips descenders; lineHeight restores room, and the small translateY
+                // re-centers the glyph (Android adds line-height leading above the text).
+                style={[
+                  {
+                    lineHeight: 24,
+                    includeFontPadding: false,
+                    textAlignVertical: 'center',
+                    transform: [{ translateY: -4 }],
+                  },
+                  active ? { color: '#ffffff' } : null,
+                ]}>
                 {f.label} ({tvGroups[f.key].length})
               </Text>
             </Pressable>
           );
         })}
       </ScrollView>
+
+      <View className="px-4 pb-2">
+        <SortBar sort={sort} onChange={setSort} />
+      </View>
 
       {tvGroups[tvFilter].length === 0 ? (
         <EmptyState

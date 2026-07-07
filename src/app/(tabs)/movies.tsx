@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 
 import { EmptyState } from '@/components/EmptyState';
 import { MediaCard } from '@/components/MediaCard';
+import { SortBar } from '@/components/SortBar';
+import { DEFAULT_SORT, sortLibraryItems, type SortState } from '@/lib/sort';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import type { MediaItem } from '@/types';
 
@@ -24,10 +26,11 @@ function UnwatchButton({ id }: { id: number }) {
 export default function MoviesScreen() {
   const router = useRouter();
   const watchedMovies = useLibraryStore((s) => s.watchedMovies);
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
 
   const movies = useMemo(
-    () => Object.values(watchedMovies).sort((a, b) => b.watchedAt - a.watchedAt),
-    [watchedMovies],
+    () => sortLibraryItems(Object.values(watchedMovies), sort, (m) => m.watchedAt),
+    [watchedMovies, sort],
   );
 
   const openItem = (item: MediaItem) => {
@@ -48,6 +51,9 @@ export default function MoviesScreen() {
 
   return (
     <View className="flex-1 bg-neutral-50 dark:bg-black">
+      <View className="px-4 pb-1 pt-3">
+        <SortBar sort={sort} onChange={setSort} />
+      </View>
       <FlatList
         data={movies}
         keyExtractor={(item) => `movie-${item.id}`}
