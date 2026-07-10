@@ -29,7 +29,7 @@ export default function OnboardingScreen() {
             <Ionicons name="film" size={40} color="white" />
           </View>
           <Text className="text-center text-3xl font-bold text-neutral-900 dark:text-neutral-50">
-            Welcome to MoviesSeriesHub
+            Welcome to Seen It
           </Text>
           <Text className="text-center text-base text-neutral-500 dark:text-neutral-400">
             Track the movies and shows you watch, and keep a watchlist for later.

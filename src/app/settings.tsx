@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { File, Paths } from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
@@ -12,6 +13,12 @@ import type { ThemePref } from '@/types';
 import { COLORS } from '@/theme/colors';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
+// Installed app version, read from the embedded config so the user can confirm an
+// update actually applied after installing a new APK.
+const APP_VERSION = Constants.expoConfig?.version ?? '—';
+const BUILD_NUMBER =
+  Constants.expoConfig?.android?.versionCode ?? Constants.expoConfig?.ios?.buildNumber ?? '—';
 
 const THEME_OPTIONS: { key: ThemePref; label: string; icon: IoniconName }[] = [
   { key: 'system', label: 'System', icon: 'phone-portrait-outline' },
@@ -74,17 +81,17 @@ export default function SettingsScreen() {
     try {
       const bytes = buildExportZip(snapshot);
       const date = new Date().toISOString().slice(0, 10);
-      const file = new File(Paths.document, `moviesserieshub-export-${date}.zip`);
+      const file = new File(Paths.document, `seen-it-export-${date}.zip`);
       if (file.exists) file.delete();
       file.create();
       file.write(bytes);
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(file.uri, {
           mimeType: 'application/zip',
-          dialogTitle: 'Export your MoviesSeriesHub library',
+          dialogTitle: 'Export your Seen It library',
         });
       } else {
-        await Share.share({ url: file.uri, title: 'MoviesSeriesHub export' });
+        await Share.share({ url: file.uri, title: 'Seen It export' });
       }
     } catch {
       Alert.alert('Could not export', 'Please try again.');
@@ -141,6 +148,12 @@ export default function SettingsScreen() {
             busy={exporting}
           />
         </View>
+      </View>
+
+      <View className="items-center pt-2">
+        <Text className="text-xs text-neutral-400 dark:text-neutral-500">
+          Seen It · v{APP_VERSION} (build {BUILD_NUMBER})
+        </Text>
       </View>
     </ScrollView>
   );

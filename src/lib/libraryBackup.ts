@@ -1,5 +1,5 @@
 /**
- * Builds a MoviesSeriesHub data export.
+ * Builds a Seen It data export.
  *
  * The export is written in the **same format the importer reads** (a ZIP of
  * `movies.json` + `series.json`, TV Time-compatible schema) so it round-trips

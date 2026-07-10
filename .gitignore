@@ -13,10 +13,17 @@ expo-env.d.ts
 .kotlin/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
 *.mobileprovision
+
+# Android release signing (secrets — keep local backups, never commit)
+credentials/
+
+# Built APKs (too large for GitHub; distribute out-of-band)
+*.apk
 
 # Metro
 .metro-health-check*

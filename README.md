@@ -1,4 +1,4 @@
-# 🎬 MoviesSeriesHub
+# 🎬 Seen It
 
 A local-first mobile app to **track the movies & TV shows you've watched** and maintain a **"To Watch"** list. Search titles from [TMDB](https://www.themoviedb.org), mark movies as watched, and track TV shows **episode by episode** with a live progress bar — all stored on-device, no account required.
 
@@ -122,9 +122,11 @@ in the browser with [Appetize.io](https://appetize.io):
 eas login
 
 # 2. One-time: link the project and provide the TMDB key to the cloud build
-#    (the build has no local .env, so the key must live in EAS).
+#    (the build has no local .env, so the key must live in EAS). Register it for
+#    every environment you build for — here preview + production.
 eas init
-eas env:create --name EXPO_PUBLIC_TMDB_API_KEY --value <your-key> --environment preview --visibility plaintext
+eas env:create --name EXPO_PUBLIC_TMDB_API_KEY --value <your-key> \
+  --environment preview --environment production --visibility plaintext
 
 # 3. Build the iOS *simulator* app (no Apple Developer account needed for simulator builds).
 #    This repo isn't a git repo, so pass EAS_NO_VCS=1.
@@ -133,7 +135,7 @@ EAS_NO_VCS=1 eas build --platform ios --profile preview-simulator
 # 4. Download the resulting .tar.gz artifact, then upload it to Appetize:
 curl -X POST https://api.appetize.io/v1/apps \
   -H "X-API-KEY: <appetize-token>" \
-  -F "file=@MoviesSeriesHub-ios-sim.tar.gz" -F "platform=ios"
+  -F "file=@SeenIt-ios-sim.tar.gz" -F "platform=ios"
 # → open the returned appURL and interact with the app in your browser.
 ```
 
@@ -145,13 +147,71 @@ key baked in. Verified end-to-end: launch, search, dark/light/system, import/exp
 
 ## 📦 Building for Distribution
 
-Build profiles live in [`eas.json`](./eas.json):
+Build profiles live in [`eas.json`](./eas.json); each profile declares its `environment`, so the matching
+EAS environment variables (notably `EXPO_PUBLIC_TMDB_API_KEY`) are injected at build time. **Register the
+TMDB key for every environment you build** (see the `eas env:create` command above — use `--environment
+preview --environment production`), otherwise search/data will be empty in the packaged app.
 
 ```bash
 eas build --profile preview           --platform android   # shareable internal build
 eas build --profile preview-simulator --platform ios       # iOS Simulator build (Appetize / Mac simulator)
 eas build --profile production        --platform all        # store-ready builds
 ```
+
+### Android
+
+- **Share directly (no store, no cost):** `eas build --profile preview --platform android` produces an
+  **APK** (`distribution: internal`). Anyone can install it by opening the EAS install link and allowing
+  "install unknown apps".
+- **Google Play:** `eas build --profile production --platform android` produces an **AAB**, then
+  `eas submit --platform android` uploads it. Requires a one-time **Google Play Developer** account ($25).
+
+#### Local sideload build (no Expo account) — `npm run apk`
+
+For a personal sideloadable APK built entirely on your machine (no EAS login), run:
+
+```bash
+npm run apk          # → ./SeenIt-v<versionCode>.apk  (signed, standalone, key baked in)
+```
+
+This runs [`scripts/build-apk.ps1`](./scripts/build-apk.ps1): it restores the release keystore if needed,
+runs `gradlew assembleRelease`, and copies the artifact to `SeenIt-v<versionCode>.apk`. Copy that file to
+the phone, tap it, and choose **Install/Update**.
+
+#### Delivering updates without data loss ⚠️
+
+Installing a newer APK **over** the existing app is an in-place **update** — your on-device library
+(MMKV) is kept — **as long as all three hold**:
+
+1. **Same package id** — `com.moviesserieshub.app` (don't change it).
+2. **Same signing key** — every release APK must be signed with the **same** keystore. Ours is a dedicated
+   release key at `android/app/seenit-release.keystore`, wired into `android/app/build.gradle`
+   (`signingConfigs.release`). It is **gitignored** and backed up under `credentials/` — **this file is the
+   crown jewel; if you lose it you can no longer ship an in-place update** (a differently-signed APK forces
+   an uninstall → data loss). Keep offline backups.
+3. **Higher `versionCode`** — bump it every release in **both** `app.json` (`android.versionCode`) and
+   `android/app/build.gradle` (`versionCode` + `versionName`).
+
+Data is lost only if you **uninstall first** or the **signing key changes**. As a belt-and-suspenders
+backup before any update, use **Settings → Export data** (round-trips through **Import data**). The
+installed version is shown at the bottom of **Settings** (`v1.0.1 (build 2)`) so you can confirm an update
+applied.
+
+> If `android/` is ever regenerated (`expo prebuild`), restore `credentials/seenit-release.keystore` into
+> `android/app/` and re-apply the `signingConfigs.release` block before building — see
+> `credentials/README.md`.
+
+### iOS
+
+- iOS has **no free sideloading** — installing on a real iPhone requires an enrolled **Apple Developer
+  Program** account ($99/yr).
+- **TestFlight / App Store:** `eas build --profile production --platform ios` then
+  `eas submit --platform ios`. EAS manages signing credentials for you.
+- **No Apple account yet?** Use the **simulator** build + Appetize flow above to demo it in a browser from
+  any OS.
+
+> Versioning is remote (`appVersionSource: remote` in `eas.json`) and the `production` profile
+> `autoIncrement`s the build number, so you don't hand-edit versions per build.
 
 ---
 
@@ -229,7 +289,7 @@ src/
   report.
 - **Import/Export use one format.** Export (`lib/libraryBackup.ts`) writes the same ZIP-of-JSON schema
   the importer reads, adding an `id.tmdb` to each item. The importer prefers `id.tmdb` when present
-  (skipping the `/find` lookup), so a MoviesSeriesHub export round-trips through the exact same import
+  (skipping the `/find` lookup), so a Seen It export round-trips through the exact same import
   pipeline, while real TV Time exports still resolve via imdb/tvdb.
 - **Appearance / dark mode.** The preference (`system` / `light` / `dark`) is persisted in the Zustand
   store; the root layout applies it via NativeWind's `setColorScheme(pref)` (which drives all `dark:`

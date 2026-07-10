@@ -1,5 +1,5 @@
 /**
- * Shared domain + TMDB API types for MoviesSeriesHub.
+ * Shared domain + TMDB API types for Seen It.
  */
 
 export type MediaType = 'movie' | 'tv';

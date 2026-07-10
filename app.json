@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "MoviesSeriesHub",
+    "name": "Seen It",
     "slug": "MoviesSeriesHub",
     "owner": "sting1712s-team",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "moviesserieshub",
@@ -15,6 +15,7 @@
     },
     "android": {
       "package": "com.moviesserieshub.app",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
