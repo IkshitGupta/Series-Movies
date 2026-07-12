@@ -4,6 +4,8 @@ import { type ComponentProps } from 'react';
 import { Pressable, type ColorValue } from 'react-native';
 
 import { useLibraryStore, useStoreHydrated } from '@/store/useLibraryStore';
+import { useAuth } from '@/store/useAuth';
+import { hasSupabase } from '@/api/supabase';
 import { COLORS } from '@/theme/colors';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -20,9 +22,13 @@ export default function TabsLayout() {
   const router = useRouter();
   const hydrated = useStoreHydrated();
   const onboarded = useLibraryStore((s) => s.onboarded);
+  const { session, loading: authLoading } = useAuth();
 
-  // Wait for MMKV rehydration before deciding, then show first-launch onboarding.
-  if (!hydrated) return null;
+  // Wait for MMKV rehydration + the initial auth check before deciding.
+  if (!hydrated || authLoading) return null;
+  // Account-only: require a signed-in session (when sync is configured).
+  if (hasSupabase() && !session) return <Redirect href="/auth" />;
+  // First-launch onboarding (import offer) for users who haven't seen it.
   if (!onboarded) return <Redirect href="/onboarding" />;
 
   const settingsButton = () => (

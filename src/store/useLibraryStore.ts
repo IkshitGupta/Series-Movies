@@ -25,9 +25,25 @@ interface LibraryState {
   onboarded: boolean;
   /** Appearance preference (System / Light / Dark). */
   theme: ThemePref;
+  /** Supabase user id whose library is currently loaded on this device, or null
+   * when the library is anonymous (never signed in). Device-local bookkeeping —
+   * never uploaded — used to keep two accounts' libraries from mixing. */
+  ownerId: string | null;
 
   // --- Appearance ---
   setTheme: (theme: ThemePref) => void;
+
+  // --- Account sync ---
+  /** Record which account this device's library belongs to. */
+  setOwner: (userId: string | null) => void;
+  /** Replace the whole library (watchlist + movies + shows) in one shot. Used by
+   * the sync engine when switching to a different account (start from empty, then
+   * pull that account's cloud data). */
+  replaceLibrary: (payload: {
+    watchlist: WatchlistItem[];
+    watchedMovies: Record<number, WatchedMovie>;
+    trackedShows: Record<number, TrackedShow>;
+  }) => void;
 
   // --- Onboarding / import ---
   setOnboarded: (value: boolean) => void;
@@ -113,8 +129,14 @@ export const useLibraryStore = create<LibraryState>()(
       trackedShows: {},
       onboarded: false,
       theme: 'system',
+      ownerId: null,
 
       setTheme: (theme) => set({ theme }),
+
+      setOwner: (userId) => set({ ownerId: userId }),
+
+      replaceLibrary: ({ watchlist, watchedMovies, trackedShows }) =>
+        set({ watchlist, watchedMovies, trackedShows }),
 
       setOnboarded: (value) => set({ onboarded: value }),
 
@@ -404,6 +426,7 @@ export const useLibraryStore = create<LibraryState>()(
         trackedShows: state.trackedShows,
         onboarded: state.onboarded,
         theme: state.theme,
+        ownerId: state.ownerId,
       }),
       // v2 narrowed ShowUserStatus; v3 also drops "dangling" shows that ended
       // up with no episode progress and no manual status; v4 adds `onboarded`

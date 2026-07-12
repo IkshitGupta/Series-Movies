@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { flushQueryCache, hydrateQueryCache, startQueryCachePersistence } from '@/store/queryPersist';
 import { flushPendingWrites, trimStorage } from '@/store/storage';
+import { useSyncEngine } from '@/store/sync';
 import { useLibraryStore } from '@/store/useLibraryStore';
 
 const queryClient = new QueryClient({
@@ -32,6 +33,9 @@ hydrateQueryCache(queryClient);
 export default function RootLayout() {
   const { colorScheme, setColorScheme } = useColorScheme();
   const theme = useLibraryStore((s) => s.theme);
+
+  // Keep the local library mirrored to the signed-in account across devices.
+  useSyncEngine();
 
   // The persisted preference is the source of truth; drive NativeWind's scheme
   // (and thus every `dark:` variant) from it. `system` follows the device.
@@ -65,6 +69,7 @@ export default function RootLayout() {
         <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
           <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="auth" options={{ headerShown: false }} />
             <Stack.Screen name="onboarding" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ title: 'Settings' }} />
             <Stack.Screen name="import" options={{ title: 'Import data' }} />
