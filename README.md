@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/images/logo.png" alt="Seen It logo" width="120" />
+</p>
+
 # 🎬 Seen It
 
 A local-first mobile app to **track the movies & TV shows you've watched** and maintain a **"To Watch"** list. Search titles from [TMDB](https://www.themoviedb.org), mark movies as watched, and track TV shows **episode by episode** with a live progress bar — all stored on-device, no account required.

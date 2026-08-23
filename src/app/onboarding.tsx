@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { Redirect, useRouter } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,11 +24,11 @@ export default function OnboardingScreen() {
     <SafeAreaView className="flex-1 bg-neutral-50 dark:bg-black">
       <View className="flex-1 justify-center gap-6 px-6">
         <View className="items-center gap-3">
-          <View
-            className="h-20 w-20 items-center justify-center rounded-3xl"
-            style={{ backgroundColor: COLORS.brand }}>
-            <Ionicons name="film" size={40} color="white" />
-          </View>
+          <Image
+            source={require('../../assets/images/logo.png')}
+            style={{ width: 80, height: 80, borderRadius: 20 }}
+            contentFit="cover"
+          />
           <Text className="text-center text-3xl font-bold text-neutral-900 dark:text-neutral-50">
             Welcome to Seen It
           </Text>

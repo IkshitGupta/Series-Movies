@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
@@ -77,11 +78,11 @@ export default function AuthScreen() {
     <SafeAreaView className="flex-1 bg-neutral-50 dark:bg-black">
       <View className="flex-1 justify-center gap-6 px-6">
         <View className="items-center gap-3">
-          <View
-            className="h-20 w-20 items-center justify-center rounded-3xl"
-            style={{ backgroundColor: COLORS.brand }}>
-            <Ionicons name="film" size={40} color="white" />
-          </View>
+          <Image
+            source={require('../../assets/images/logo.png')}
+            style={{ width: 80, height: 80, borderRadius: 20 }}
+            contentFit="cover"
+          />
           <Text className="text-center text-3xl font-bold text-neutral-900 dark:text-neutral-50">
             {isSignup ? 'Create your account' : 'Welcome back'}
           </Text>

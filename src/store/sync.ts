@@ -3,33 +3,29 @@ import { AppState } from 'react-native';
 import { create } from 'zustand';
 
 import { hasSupabase, supabase } from '@/api/supabase';
+import { mergeLibraries, type LibraryPayload } from '@/store/mergeLibraries';
 import { flushPendingWrites } from '@/store/storage';
 import { useAuth } from '@/store/useAuth';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import type { TrackedShow, WatchedMovie, WatchlistItem } from '@/types';
 
 /**
  * Cross-device library sync.
  *
  * The library lives locally (MMKV/Zustand) and is mirrored to a single Supabase
  * row per user (`public.libraries`, `data jsonb`). Sync is **offline-first and
- * safe-merge**: we never delete on merge, we union collections and keep the
- * richest data, so two devices editing offline converge without losing marks.
+ * safe-merge**: watch marks (episodes/movies/watchlist) are unioned so none are
+ * ever lost, while each show's *manual* status chip is resolved **newest-wins**
+ * by `lastUpdated`, so a local status change/clear isn't reverted by the stale
+ * cloud copy.
  *
  * A sync is a pull → merge → push:
  *   1. read the account's cloud row,
- *   2. merge it into the local library (union of watched/watchlist/episodes),
+ *   2. merge it with the local library (see the merge section below),
  *   3. upload the merged result back.
- * Because the merge is a commutative union, running it on both devices converges.
+ * The merge is order-independent, so running it on both devices converges.
  */
 
 const TABLE = 'libraries';
-
-export interface LibraryPayload {
-  watchlist: WatchlistItem[];
-  watchedMovies: Record<number, WatchedMovie>;
-  trackedShows: Record<number, TrackedShow>;
-}
 
 // While we apply a pulled snapshot into the store, suppress the change-listener
 // so the merge doesn't schedule another push (which would loop).
@@ -55,15 +51,16 @@ function normalizePayload(raw: unknown): LibraryPayload {
   };
 }
 
-/** Merge a pulled cloud snapshot into the local library (union, no deletions). */
+// ---------------------------------------------------------------------------
+// Apply a pulled snapshot.
+// ---------------------------------------------------------------------------
+
+/** Merge a pulled cloud snapshot into the local library and apply the result. */
 function applyRemote(payload: LibraryPayload): void {
   applyingRemote = true;
   try {
-    useLibraryStore.getState().importLibrary({
-      shows: payload.trackedShows,
-      movies: payload.watchedMovies,
-      watchlist: payload.watchlist,
-    });
+    const merged = mergeLibraries(currentPayload(), payload);
+    useLibraryStore.getState().replaceLibrary(merged);
   } finally {
     applyingRemote = false;
   }
