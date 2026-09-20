@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs, useRouter } from 'expo-router';
 import { type ComponentProps } from 'react';
-import { Pressable, type ColorValue } from 'react-native';
+import { ActivityIndicator, Pressable, View, type ColorValue } from 'react-native';
 
 import { useLibraryStore, useStoreHydrated } from '@/store/useLibraryStore';
 import { useAuth } from '@/store/useAuth';
+import { useSyncStatus } from '@/store/sync';
 import { hasSupabase } from '@/api/supabase';
 import { COLORS } from '@/theme/colors';
 
@@ -23,12 +24,26 @@ export default function TabsLayout() {
   const hydrated = useStoreHydrated();
   const onboarded = useLibraryStore((s) => s.onboarded);
   const { session, loading: authLoading } = useAuth();
+  const lastSyncedAt = useSyncStatus((s) => s.lastSyncedAt);
+  const syncPhase = useSyncStatus((s) => s.phase);
 
   // Wait for MMKV rehydration + the initial auth check before deciding.
   if (!hydrated || authLoading) return null;
   // Account-only: require a signed-in session (when sync is configured).
   if (hasSupabase() && !session) return <Redirect href="/auth" />;
-  // First-launch onboarding (import offer) for users who haven't seen it.
+  // Signed in but not yet onboarded on this device: hold for the first cloud
+  // sync so a returning account's data can auto-dismiss onboarding (see
+  // sync.applyRemote) instead of wrongly showing "import / start fresh".
+  const awaitingFirstSync =
+    hasSupabase() && !!session && lastSyncedAt == null && syncPhase !== 'error';
+  if (!onboarded && awaitingFirstSync) {
+    return (
+      <View className="flex-1 items-center justify-center bg-neutral-50 dark:bg-black">
+        <ActivityIndicator size="large" color={COLORS.brand} />
+      </View>
+    );
+  }
+  // First-launch onboarding (import offer) for genuinely new / empty accounts.
   if (!onboarded) return <Redirect href="/onboarding" />;
 
   const settingsButton = () => (

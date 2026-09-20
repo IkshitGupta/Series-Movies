@@ -69,6 +69,7 @@ export default function SearchScreen() {
             data={trending.data}
             keyExtractor={(item) => `${item.mediaType}-${item.id}`}
             keyboardShouldPersistTaps="handled"
+            style={{ flex: 1 }}
             contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 32 }}
             ListHeaderComponent={
               <Text className="pb-2 text-base font-semibold text-neutral-900 dark:text-neutral-50">
@@ -122,6 +123,7 @@ export default function SearchScreen() {
         data={data}
         keyExtractor={(item) => `${item.mediaType}-${item.id}`}
         keyboardShouldPersistTaps="handled"
+        style={{ flex: 1 }}
         contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 32 }}
         ListHeaderComponent={themeChip}
         renderItem={({ item }) => (

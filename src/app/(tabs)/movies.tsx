@@ -59,6 +59,7 @@ export default function MoviesScreen() {
       <FlatList
         data={movies}
         keyExtractor={(item) => `movie-${item.id}`}
+        style={{ flex: 1 }}
         contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 32 }}
         renderItem={({ item }) => (
           <MediaCard item={item} onPress={() => openItem(item)} right={<UnwatchButton id={item.id} />} />

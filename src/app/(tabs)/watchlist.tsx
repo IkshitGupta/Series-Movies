@@ -103,6 +103,7 @@ export default function WatchlistScreen() {
         <FlatList
           data={data}
           keyExtractor={(item) => `${item.mediaType}-${item.id}`}
+          style={{ flex: 1 }}
           contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 32 }}
           renderItem={({ item }) => (
             <MediaCard

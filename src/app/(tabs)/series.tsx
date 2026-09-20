@@ -196,7 +196,7 @@ export default function SeriesScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0 }}
+        style={{ flexGrow: 0, flexShrink: 0 }}
         contentContainerStyle={{
           paddingHorizontal: 16,
           gap: 8,
@@ -231,6 +231,7 @@ export default function SeriesScreen() {
         <FlatList
           data={tvGroups[tvFilter]}
           keyExtractor={(item) => `tv-${item.id}`}
+          style={{ flex: 1 }}
           contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 8, paddingBottom: 32 }}
           renderItem={({ item }) => (
             <SeriesRow

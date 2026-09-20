@@ -60,7 +60,16 @@ function applyRemote(payload: LibraryPayload): void {
   applyingRemote = true;
   try {
     const merged = mergeLibraries(currentPayload(), payload);
-    useLibraryStore.getState().replaceLibrary(merged);
+    const store = useLibraryStore.getState();
+    store.replaceLibrary(merged);
+    // A returning account that already has synced data shouldn't be shown the
+    // first-run onboarding ("import / start fresh") — mark it onboarded so the
+    // gate lets it straight through to its library.
+    const hasData =
+      merged.watchlist.length > 0 ||
+      Object.keys(merged.watchedMovies).length > 0 ||
+      Object.keys(merged.trackedShows).length > 0;
+    if (hasData && !store.onboarded) store.setOnboarded(true);
   } finally {
     applyingRemote = false;
   }
