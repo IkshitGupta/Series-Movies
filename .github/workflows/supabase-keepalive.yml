@@ -1,0 +1,49 @@
+# Keeps the free-tier Supabase project from auto-pausing (~7 days of inactivity),
+# which would otherwise break sign-in with a "Network error" until manually resumed.
+#
+# It runs a tiny REST query every 2 days (a real DB hit counts as activity — a bare
+# health check may not). It only *prevents* pausing; it can't resume an
+# already-paused project (do that once from the Supabase dashboard).
+#
+# Config comes from repo secrets — add both under
+# Settings → Secrets and variables → Actions → New repository secret:
+#   SUPABASE_URL       = https://<project-ref>.supabase.co
+#   SUPABASE_ANON_KEY  = <publishable/anon key>
+# (These are public/RLS-gated values, but keeping them in secrets makes rotation
+# a settings change instead of a code edit.)
+#
+# Note: GitHub disables scheduled workflows after ~60 days with no repo commits.
+
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: '0 7 */2 * *' # every 2 days at 07:00 UTC
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase (tiny DB query keeps the project active)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "Missing repo secrets SUPABASE_URL / SUPABASE_ANON_KEY."
+            echo "Add them under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            "$SUPABASE_URL/rest/v1/libraries?select=user_id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          echo "HTTP $code"
+          if [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
+            echo "Keep-alive OK — project is active."
+          else
+            echo "Keep-alive request returned HTTP $code (project may be paused/unreachable)."
+            exit 1
+          fi
