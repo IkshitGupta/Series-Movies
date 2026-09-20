@@ -11,3 +11,14 @@
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
 }
+
+/* Web: full-height root and a brand backdrop to avoid a white flash before the
+   app mounts (native ignores these selectors). */
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  background-color: #010102;
+}

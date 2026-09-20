@@ -98,6 +98,12 @@ interface ParsedShow {
   firstWatchedSeason: number | null;
   userStatus?: ShowUserStatus;
   hasWatched: boolean;
+  /**
+   * True when every numbered (non-special) episode the export lists for this show
+   * is watched. Used to reconcile a fully-watched show to TMDB's episode set so a
+   * TheTVDB↔TMDB numbering/count mismatch doesn't strand it in "Watching".
+   */
+  fullyWatchedInExport: boolean;
 }
 
 export interface ParsedExport {
@@ -146,6 +152,27 @@ function mapUserStatus(status: string): ShowUserStatus | undefined {
   if (status === 'stopped') return 'stopped';
   if (status === 'watch_later') return 'continue_later';
   return undefined;
+}
+
+/** A show TMDB considers finished — no further episodes will be added. */
+function isEndedShow(status: string | undefined): boolean {
+  return status === 'Ended' || status === 'Canceled';
+}
+
+/**
+ * Every numbered (non-special) episode key TMDB knows for a show, derived from the
+ * per-season `episode_count`. Used to reconcile a fully-watched import to TMDB's
+ * numbering so a TheTVDB↔TMDB count mismatch doesn't leave it short of "Completed".
+ */
+function allTmdbEpisodeKeys(details: TmdbTvDetails): string[] {
+  const keys: string[] = [];
+  for (const season of details.seasons ?? []) {
+    if (season.season_number < 1 || season.episode_count < 1) continue;
+    for (let e = 1; e <= season.episode_count; e += 1) {
+      keys.push(episodeKey(season.season_number, e));
+    }
+  }
+  return keys;
 }
 
 function toEpochMs(value: string | null): number | null {
@@ -201,11 +228,16 @@ export function parseTvTimeZip(bytes: Uint8Array): ParsedExport {
       const episodeKeys = new Set<string>();
       const episodeWatchedAt: Record<string, number> = {};
       let firstWatchedSeason: number | null = null;
+      let numberedTotal = 0;
+      let numberedWatched = 0;
       for (const season of s.seasons ?? []) {
         // Skip specials (season 0); the app tracks numbered episodes only.
         if (season.number < 1 || season.is_specials) continue;
         for (const ep of season.episodes ?? []) {
-          if (!ep.is_watched || ep.special) continue;
+          if (ep.special) continue;
+          numberedTotal += 1;
+          if (!ep.is_watched) continue;
+          numberedWatched += 1;
           const key = episodeKey(season.number, ep.number);
           episodeKeys.add(key);
           const ms = toEpochMs(ep.watched_at ?? null);
@@ -224,6 +256,7 @@ export function parseTvTimeZip(bytes: Uint8Array): ParsedExport {
         firstWatchedSeason,
         userStatus: mapUserStatus(s.status),
         hasWatched: episodeKeys.size > 0,
+        fullyWatchedInExport: numberedTotal > 0 && numberedWatched === numberedTotal,
       });
     }
   }
@@ -410,9 +443,24 @@ export async function resolveLibrary(
       };
       if (s.hasWatched) {
         const episodeRuntime = await resolveEpisodeRuntime(tmdbId, d, s.firstWatchedSeason);
+        // Reconcile a fully-watched ended show to TMDB's episode set. The export's
+        // TheTVDB numbering can yield fewer unique keys than TMDB's episode count
+        // (episodes TMDB splits that TheTVDB merges), which would otherwise strand a
+        // completed show in "Watching". Guards:
+        //  - only ended shows (a returning show that's merely caught up must stay
+        //    "Watching");
+        //  - only TheTVDB-sourced shows (`tmdbId == null`): our own exports carry a
+        //    TMDB id and emit *only* watched episodes, so `fullyWatchedInExport` is
+        //    always true there and must not force-complete a partial round-trip;
+        //  - never shrink the watched set.
+        let watchedEpisodes = [...s.episodeKeys];
+        if (s.fullyWatchedInExport && s.tmdbId == null && isEndedShow(d.status)) {
+          const full = allTmdbEpisodeKeys(d);
+          if (full.length >= watchedEpisodes.length) watchedEpisodes = full;
+        }
         shows[tmdbId] = {
           ...base,
-          watchedEpisodes: [...s.episodeKeys],
+          watchedEpisodes,
           episodeWatchedAt:
             Object.keys(s.episodeWatchedAt).length > 0 ? s.episodeWatchedAt : undefined,
           totalEpisodes: d.number_of_episodes,
@@ -420,7 +468,7 @@ export async function resolveLibrary(
           userStatus: s.userStatus,
           lastUpdated: Date.now(),
         };
-        episodes += s.episodeKeys.size;
+        episodes += watchedEpisodes.length;
       } else {
         watchlist.push({ ...base, addedAt: Date.now() });
       }

@@ -2,6 +2,7 @@ import '@/global.css';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'nativewind';
 import { useEffect } from 'react';
@@ -12,6 +13,8 @@ import { flushQueryCache, hydrateQueryCache, startQueryCachePersistence } from '
 import { flushPendingWrites, trimStorage } from '@/store/storage';
 import { useSyncEngine } from '@/store/sync';
 import { useLibraryStore } from '@/store/useLibraryStore';
+
+import { WebFrame } from '@/components/WebFrame';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -64,23 +67,39 @@ export default function RootLayout() {
   const isDark = colorScheme === 'dark';
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-          <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="auth" options={{ headerShown: false }} />
-            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-            <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-            <Stack.Screen name="import" options={{ title: 'Import data' }} />
-            <Stack.Screen name="movie/[id]" options={{ title: 'Movie' }} />
-            <Stack.Screen name="show/[id]" options={{ title: 'Show' }} />
-            <Stack.Screen name="genre/[type]" options={{ title: 'Genre' }} />
-            <Stack.Screen name="keyword/[id]" options={{ title: 'Theme' }} />
-          </Stack>
-          <StatusBar style={isDark ? 'light' : 'dark'} />
-        </ThemeProvider>
-      </QueryClientProvider>
-    </GestureHandlerRootView>
+    <>
+      <Head>
+        <title>Seen It — Track movies &amp; TV shows</title>
+        <meta
+          name="description"
+          content="Track the movies and TV shows you've watched, keep a watchlist, and sync your library across devices with Seen It."
+        />
+        <meta name="theme-color" content="#010102" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Seen It" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      </Head>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+            <WebFrame isDark={isDark}>
+              <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="auth" options={{ headerShown: false }} />
+                <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+                <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+                <Stack.Screen name="import" options={{ title: 'Import data' }} />
+                <Stack.Screen name="movie/[id]" options={{ title: 'Movie' }} />
+                <Stack.Screen name="show/[id]" options={{ title: 'Show' }} />
+                <Stack.Screen name="genre/[type]" options={{ title: 'Genre' }} />
+                <Stack.Screen name="keyword/[id]" options={{ title: 'Theme' }} />
+              </Stack>
+            </WebFrame>
+            <StatusBar style={isDark ? 'light' : 'dark'} />
+          </ThemeProvider>
+        </QueryClientProvider>
+      </GestureHandlerRootView>
+    </>
   );
 }

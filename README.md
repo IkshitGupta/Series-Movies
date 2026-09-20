@@ -115,6 +115,61 @@ npm start            # expo start --dev-client
 
 ---
 
+## 🌐 Website (Expo Web)
+
+Seen It ships a **parallel website** from the same codebase via **React Native Web** — ideal for iOS
+users without a native build. Sign in with the **same account** and your library syncs between the app
+and the web automatically.
+
+**Feature parity:** search, movie/TV detail, per-episode tracking, watchlist, stats, dark mode, accounts
++ cross-device sync, and **import/export** (the file picker uses the browser's native dialog; the import
+CSV report and library ZIP download as normal browser downloads).
+
+### Run in development
+
+```bash
+npm run web            # expo start --web (http://localhost:8081)
+```
+
+### Build the static site
+
+```bash
+npm run web:export     # → dist/  (expo export --platform web)
+npx serve dist         # preview the production build locally
+```
+
+This produces a **single-page app** (`web.output: "single"`): a client-rendered SPA (`dist/index.html`
++ JS/CSS bundle). All data loads client-side (TMDB + your Supabase library), so there is **no server to
+run** — deploy `dist/` to any static host (GitHub Pages, Netlify, Vercel, Cloudflare Pages, S3, …).
+
+### Deploy to Netlify (recommended)
+
+The repo includes a **`netlify.toml`** (build = `npm run web:export`, publish = `dist`, plus the SPA
+rewrite), so setup is:
+
+1. In [Netlify](https://app.netlify.com) → **Add new site → Import from Git** → pick this repo. Netlify
+   reads `netlify.toml` automatically (build command + publish dir are pre-filled).
+2. **Site settings → Environment variables** → add the three (baked in at build time, all client-safe):
+   `EXPO_PUBLIC_TMDB_API_KEY`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+3. **Deploy.** Every push to the repo auto-builds and publishes. Your site is at `https://<name>.netlify.app`
+   (add a custom domain under **Domain management** if you like).
+
+### Hosting notes
+
+- **SPA rewrite (required):** because routing is client-side, the host must serve `index.html` for **all**
+  unknown paths, so deep links like `/show/1396` work on hard refresh. `netlify.toml` already does this
+  (`/* → /index.html 200`); on other hosts use Vercel `rewrites`, or Cloudflare Pages (automatic).
+- **Env vars:** `EXPO_PUBLIC_TMDB_API_KEY`, `EXPO_PUBLIC_SUPABASE_URL`, and the Supabase **anon** key are
+  embedded in the bundle at export time (same as the native app). That's safe — the anon key is gated by
+  Row-Level Security, and the TMDB v3 key is a client read key. **No** service-role secrets are shipped.
+  They live in the host's env-var settings (or your local `.env` for manual exports), not in the repo.
+- **Sign-in needs the Supabase project awake** — a paused/free project makes auth fail with a network
+  error even though the site loads.
+- **Sub-path hosting** (e.g. a GitHub Pages *project* page under `/repo/`) needs a base URL — export with
+  a `baseUrl` config; root-domain hosts (Netlify/Vercel/Cloudflare) need nothing extra.
+
+---
+
 ## 🍏 Testing on iOS from Windows (no Mac)
 
 The iOS Simulator is macOS-only, and Expo Go can't load this app (custom native modules). To exercise a

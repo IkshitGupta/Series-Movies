@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { File, Paths } from 'expo-file-system';
 import { useRouter } from 'expo-router';
-import * as Sharing from 'expo-sharing';
 import { type ComponentProps, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Share, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
+import { saveOrShare } from '@/lib/download';
 import { buildExportZip, isLibraryEmpty } from '@/lib/libraryBackup';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { syncNow, useSyncStatus } from '@/store/sync';
@@ -151,18 +150,12 @@ export default function SettingsScreen() {
     try {
       const bytes = buildExportZip(snapshot);
       const date = new Date().toISOString().slice(0, 10);
-      const file = new File(Paths.document, `seen-it-export-${date}.zip`);
-      if (file.exists) file.delete();
-      file.create();
-      file.write(bytes);
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(file.uri, {
-          mimeType: 'application/zip',
-          dialogTitle: 'Export your Seen It library',
-        });
-      } else {
-        await Share.share({ url: file.uri, title: 'Seen It export' });
-      }
+      await saveOrShare({
+        data: bytes,
+        filename: `seen-it-export-${date}.zip`,
+        mimeType: 'application/zip',
+        dialogTitle: 'Export your Seen It library',
+      });
     } catch {
       Alert.alert('Could not export', 'Please try again.');
     } finally {

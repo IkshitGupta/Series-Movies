@@ -1,0 +1,23 @@
+# Netlify deploy config for the Seen It website (Expo Web static SPA).
+#
+# Build: `npm run web:export` (expo export --platform web) → ./dist
+# Env vars (set in Netlify UI → Site settings → Environment variables — they are
+# baked into the client bundle at build time; all are client-safe / public):
+#   EXPO_PUBLIC_TMDB_API_KEY
+#   EXPO_PUBLIC_SUPABASE_URL
+#   EXPO_PUBLIC_SUPABASE_ANON_KEY
+
+[build]
+  command = "npm run web:export"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Single-page app fallback: existing files (JS/CSS/assets) are served as-is;
+# any other path (e.g. a deep link like /show/1396 opened directly or on
+# refresh) falls back to the client-rendered shell.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

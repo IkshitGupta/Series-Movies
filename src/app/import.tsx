@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { File, Paths } from 'expo-file-system';
 import { useRouter } from 'expo-router';
-import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Share, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { saveOrShare } from '@/lib/download';
+import { readDocumentBytes } from '@/lib/pickFile';
 import {
   buildUnmatchedCsv,
   parseTvTimeZip,
@@ -42,13 +42,15 @@ export default function ImportScreen() {
         type: ['application/zip', 'application/octet-stream', '*/*'],
         copyToCacheDirectory: true,
         multiple: false,
+        // Web: skip base64 so the picker keeps the file/blob we read directly.
+        base64: false,
       });
       if (picked.canceled || !picked.assets?.[0]) return;
 
       setPhase('working');
       setProgress(null);
       setStep('reading');
-      const bytes = await new File(picked.assets[0].uri).bytes();
+      const bytes = await readDocumentBytes(picked.assets[0]);
 
       setStep('parsing');
       // Yield so the UI can paint the "parsing" label before the sync unzip.
@@ -77,24 +79,14 @@ export default function ImportScreen() {
     if (!result || result.unmatched.length === 0) return;
     const csv = buildUnmatchedCsv(result.unmatched);
     try {
-      const file = new File(Paths.document, 'unmatched-items.csv');
-      if (file.exists) file.delete();
-      file.create();
-      file.write(csv);
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(file.uri, {
-          mimeType: 'text/csv',
-          dialogTitle: 'Items not imported',
-          UTI: 'public.comma-separated-values-text',
-        });
-      } else {
-        await Share.share({ message: csv, title: 'Items not imported' });
-      }
-    } catch {
-      // Last-resort fallback: hand the raw CSV text to any app.
-      await Share.share({ message: csv }).catch(() => {
-        Alert.alert('Could not export the report', 'Please try again.');
+      await saveOrShare({
+        data: csv,
+        filename: 'unmatched-items.csv',
+        mimeType: 'text/csv',
+        dialogTitle: 'Items not imported',
       });
+    } catch {
+      Alert.alert('Could not export the report', 'Please try again.');
     }
   };
 
