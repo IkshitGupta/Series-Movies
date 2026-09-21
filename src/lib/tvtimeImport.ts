@@ -105,6 +105,10 @@ interface ParsedShow {
    * TheTVDB↔TMDB numbering/count mismatch doesn't strand it in "Watching".
    */
   fullyWatchedInExport: boolean;
+  /** Season numbers the export enumerates episodes for — used to avoid expanding
+   * a fully-watched *single-season* TheTVDB entry across a multi-season TMDB show
+   * (e.g. anime split into per-season TheTVDB series). */
+  exportSeasonNumbers: number[];
 }
 
 export interface ParsedExport {
@@ -208,7 +212,8 @@ export function parseTvTimeZip(bytes: Uint8Array): ParsedExport {
 
   const movies: ParsedMovie[] = [];
   if (moviesRaw) {
-    const raw = JSON.parse(strFromU8(moviesRaw)) as TvTimeMovieRaw[];
+    const parsed = JSON.parse(strFromU8(moviesRaw)) as unknown;
+    const raw = Array.isArray(parsed) ? (parsed as TvTimeMovieRaw[]) : [];
     for (const m of raw) {
       movies.push({
         imdbId: m.id?.imdb ?? null,
@@ -224,10 +229,12 @@ export function parseTvTimeZip(bytes: Uint8Array): ParsedExport {
 
   const shows: ParsedShow[] = [];
   if (seriesRaw) {
-    const raw = JSON.parse(strFromU8(seriesRaw)) as TvTimeSeriesRaw[];
+    const parsed = JSON.parse(strFromU8(seriesRaw)) as unknown;
+    const raw = Array.isArray(parsed) ? (parsed as TvTimeSeriesRaw[]) : [];
     for (const s of raw) {
       const episodeKeys = new Set<string>();
       const episodeWatchedAt: Record<string, number> = {};
+      const exportSeasons = new Set<number>();
       let firstWatchedSeason: number | null = null;
       let numberedTotal = 0;
       let numberedWatched = 0;
@@ -237,6 +244,7 @@ export function parseTvTimeZip(bytes: Uint8Array): ParsedExport {
         for (const ep of season.episodes ?? []) {
           if (ep.special) continue;
           numberedTotal += 1;
+          exportSeasons.add(season.number);
           if (!ep.is_watched) continue;
           numberedWatched += 1;
           const key = episodeKey(season.number, ep.number);
@@ -258,6 +266,7 @@ export function parseTvTimeZip(bytes: Uint8Array): ParsedExport {
         userStatus: mapUserStatus(s.status),
         hasWatched: episodeKeys.size > 0,
         fullyWatchedInExport: numberedTotal > 0 && numberedWatched === numberedTotal,
+        exportSeasonNumbers: [...exportSeasons],
       });
     }
   }
@@ -385,11 +394,13 @@ export async function resolveLibrary(
         cast: topCast(d),
       };
       if (m.isWatched) {
-        movies[movieId] = {
-          ...base,
-          watchedAt: m.watchedAt ?? Date.now(),
-          runtime: d.runtime ?? undefined,
-        };
+        const watchedAt = m.watchedAt ?? Date.now();
+        const existing = movies[movieId];
+        // Two export entries can resolve to the same TMDB id — keep the earliest
+        // watch date instead of letting whichever finishes last overwrite.
+        movies[movieId] = existing
+          ? { ...existing, watchedAt: Math.min(existing.watchedAt, watchedAt) }
+          : { ...base, watchedAt, runtime: d.runtime ?? undefined };
       } else {
         watchlist.push({ ...base, addedAt: Date.now() });
       }
@@ -455,23 +466,65 @@ export async function resolveLibrary(
         //  - only TheTVDB-sourced shows (`tmdbId == null`): our own exports carry a
         //    TMDB id and emit *only* watched episodes, so `fullyWatchedInExport` is
         //    always true there and must not force-complete a partial round-trip;
+        //  - only when the export enumerates *every* numbered TMDB season, so a
+        //    single-season TheTVDB entry mapped onto a multi-season TMDB show
+        //    (e.g. anime split into per-season series) isn't force-completed
+        //    across seasons the export never covered;
         //  - never shrink the watched set.
         let watchedEpisodes = [...s.episodeKeys];
-        if (s.fullyWatchedInExport && s.tmdbId == null && isEndedShow(d.status)) {
+        const tmdbSeasons = d.seasons.filter((se) => se.season_number >= 1 && se.episode_count > 0);
+        const covered = new Set(s.exportSeasonNumbers);
+        const coversAllSeasons =
+          tmdbSeasons.length > 0 && tmdbSeasons.every((se) => covered.has(se.season_number));
+        if (s.fullyWatchedInExport && s.tmdbId == null && isEndedShow(d.status) && coversAllSeasons) {
           const full = allTmdbEpisodeKeys(d);
           if (full.length >= watchedEpisodes.length) watchedEpisodes = full;
         }
-        shows[tmdbId] = {
-          ...base,
-          watchedEpisodes,
-          episodeWatchedAt:
-            Object.keys(s.episodeWatchedAt).length > 0 ? s.episodeWatchedAt : undefined,
-          totalEpisodes: d.number_of_episodes,
-          episodeRuntime,
-          userStatus: s.userStatus,
-          lastUpdated: Date.now(),
-        };
-        episodes += watchedEpisodes.length;
+        const existing = shows[tmdbId];
+        if (existing) {
+          // Another export entry already resolved to this TMDB id (e.g. two
+          // TheTVDB series that map to one TMDB show) — union their progress
+          // instead of letting whichever request finishes last overwrite it.
+          const union = new Set([...existing.watchedEpisodes, ...watchedEpisodes]);
+          const before = existing.watchedEpisodes.length;
+          shows[tmdbId] = {
+            ...existing,
+            watchedEpisodes: [...union],
+            episodeWatchedAt: { ...existing.episodeWatchedAt, ...s.episodeWatchedAt },
+            userStatus: existing.userStatus ?? s.userStatus,
+            episodeRuntime: existing.episodeRuntime ?? episodeRuntime,
+            lastUpdated: Date.now(),
+          };
+          episodes += union.size - before;
+        } else {
+          shows[tmdbId] = {
+            ...base,
+            watchedEpisodes,
+            episodeWatchedAt:
+              Object.keys(s.episodeWatchedAt).length > 0 ? { ...s.episodeWatchedAt } : undefined,
+            totalEpisodes: d.number_of_episodes,
+            episodeRuntime,
+            userStatus: s.userStatus,
+            lastUpdated: Date.now(),
+          };
+          episodes += watchedEpisodes.length;
+        }
+      } else if (s.userStatus) {
+        // A show with a manual status but no watched episodes ("Stopped watching"
+        // / "Continue later") is tracked with that status — not demoted to the
+        // watchlist, which would silently drop the status on an export round-trip.
+        const existing = shows[tmdbId];
+        if (!existing) {
+          shows[tmdbId] = {
+            ...base,
+            watchedEpisodes: [],
+            totalEpisodes: d.number_of_episodes,
+            userStatus: s.userStatus,
+            lastUpdated: Date.now(),
+          };
+        } else if (!existing.userStatus) {
+          shows[tmdbId] = { ...existing, userStatus: s.userStatus };
+        }
       } else {
         watchlist.push({ ...base, addedAt: Date.now() });
       }

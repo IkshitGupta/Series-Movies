@@ -23,11 +23,20 @@ export function useAuth(): AuthState {
     // When Supabase isn't configured, `loading` already initialised to false.
     if (!hasSupabase()) return;
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      setSession(data.session);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        setSession(data.session);
+        setLoading(false);
+      })
+      .catch(() => {
+        // Never leave the app stuck on a blank loading screen if the initial
+        // session read fails (e.g. corrupt stored token) — fall back to no session.
+        if (!active) return;
+        setSession(null);
+        setLoading(false);
+      });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next);
     });

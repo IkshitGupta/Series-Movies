@@ -28,6 +28,15 @@ function startOfTodayMs(): number {
   return now.getTime();
 }
 
+/** Today as a local-calendar `YYYY-MM-DD` (not UTC), for comparing against a
+ * show-local episode `air_date`. */
+export function localTodayIso(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 /**
  * Upcoming-content info for a show.
  *
@@ -54,6 +63,17 @@ export function getUpcoming(
     return { newSeason: true, date: null };
   }
   return null;
+}
+
+/**
+ * Whether a specific episode may be marked watched. Only a *known future*
+ * `air_date` blocks it — a missing/unknown date (common on TMDB for older or
+ * non-English shows) counts as aired so those episodes stay markable. Compares
+ * at local-date granularity.
+ */
+export function hasEpisodeAired(airDate: string | null | undefined, todayIso?: string): boolean {
+  if (!airDate) return true; // unknown date → treat as aired (still markable)
+  return airDate <= (todayIso ?? localTodayIso());
 }
 
 /** Format an ISO date as e.g. "Aug 12, 2026" without relying on Intl (Hermes-safe). */

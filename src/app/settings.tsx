@@ -94,13 +94,8 @@ export default function SettingsScreen() {
     void syncNow();
   };
 
-  const signOut = async () => {
-    if (signingOut) return;
-    setSigningOut(true);
+  const doSignOut = async () => {
     try {
-      // Push any un-synced local changes before the session is torn down so
-      // nothing made on this device is lost when signing out.
-      await syncNow().catch(() => undefined);
       await supabase.auth.signOut();
       // Session is now cleared → send the user back to the login gate.
       router.replace('/auth');
@@ -108,6 +103,35 @@ export default function SettingsScreen() {
       Alert.alert('Could not sign out', 'Please try again.');
       setSigningOut(false);
     }
+  };
+
+  const signOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    // Push any un-synced local changes before the session is torn down. `syncNow`
+    // resolves with the authoritative result even when it coalesced with an
+    // in-flight push, so a `false` here means the push genuinely didn't land.
+    const synced = await syncNow().catch(() => false);
+    if (!synced && hasSupabase()) {
+      setSigningOut(false);
+      Alert.alert(
+        'Unsynced changes',
+        "Some changes couldn't be saved to the cloud and may be lost on this device. Sign out anyway?",
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Sign out',
+            style: 'destructive',
+            onPress: () => {
+              setSigningOut(true);
+              void doSignOut();
+            },
+          },
+        ],
+      );
+      return;
+    }
+    await doSignOut();
   };
 
   const openEditName = () => {

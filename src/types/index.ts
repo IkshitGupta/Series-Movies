@@ -79,6 +79,65 @@ export function mediaKey(mediaType: MediaType, id: number): string {
   return `${mediaType}-${id}`;
 }
 
+/** Key for a per-episode deletion marker, e.g. `123:S1E4`. */
+export function episodeTombstoneKey(showId: number, epKey: string): string {
+  return `${showId}:${epKey}`;
+}
+
+/**
+ * Deletion markers ("removals") so removals survive the offline-first union
+ * merge instead of being resurrected by a stale cloud copy. Each value is the
+ * epoch-ms time of the removal.
+ */
+export interface Tombstones {
+  /** Unmarked watched movies, keyed by movie id. */
+  movies: Record<number, number>;
+  /** Untracked shows, keyed by show id. Untracking also writes a per-episode
+   * tombstone (below) for every episode it removes, so re-tracking a show starts
+   * fresh instead of resurrecting its old progress. */
+  shows: Record<number, number>;
+  /** Cleared manual show status ("Stopped watching"/"Continue later"), keyed by
+   * show id. Clears only the `userStatus` on merge (never touches episodes), so a
+   * status-only show the user cleared doesn't resurrect from a stale cloud copy. */
+  showStatus: Record<number, number>;
+  /** Removed watchlist entries, keyed by {@link mediaKey}. */
+  watchlist: Record<string, number>;
+  /** Unticked episodes, keyed by {@link episodeTombstoneKey}. */
+  episodes: Record<string, number>;
+}
+
+/**
+ * "Additions" markers — the epoch-ms time an item was (re-)added — for cases
+ * where the item's own content timestamp isn't a reliable add time: a movie's
+ * `watchedAt` is min-merged (so it erodes), and an *imported* episode carries a
+ * historical (old) watch date that must still beat a recent tombstone (e.g. after
+ * an untrack). Keyed per-episode so it lifts only the episodes actually imported.
+ * Shows use `lastUpdated` and watchlist items use `addedAt` (both non-eroding),
+ * so they need no marker here.
+ */
+export interface Revivals {
+  /** (Re-)added watched movies, keyed by movie id. */
+  movies: Record<number, number>;
+  /** (Re-)added episodes whose stored watch date is historical (imports), keyed
+   * by {@link episodeTombstoneKey}. */
+  episodes: Record<string, number>;
+  /** Time a manual show status was SET, keyed by show id. Paired with
+   * `tombstones.showStatus` to make the chip a per-field LWW register that a
+   * status change resolves independently of the show's `lastUpdated` (which
+   * unrelated episode edits bump). */
+  showStatus: Record<number, number>;
+}
+
+/** An empty tombstone set. */
+export function emptyTombstones(): Tombstones {
+  return { movies: {}, shows: {}, showStatus: {}, watchlist: {}, episodes: {} };
+}
+
+/** An empty revival set. */
+export function emptyRevivals(): Revivals {
+  return { movies: {}, episodes: {}, showStatus: {} };
+}
+
 // ---------------------------------------------------------------------------
 // TMDB API response shapes (only the fields we consume).
 // ---------------------------------------------------------------------------

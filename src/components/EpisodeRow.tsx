@@ -16,6 +16,8 @@ interface EpisodeRowProps {
   /** Mark this episode and every earlier one (incl. previous seasons) as watched. */
   onWatchTillHere?: (episodeNumber: number) => void;
   busy?: boolean;
+  /** Known future episode — can't be marked watched yet. */
+  unaired?: boolean;
 }
 
 export const EpisodeRow = memo(function EpisodeRow({
@@ -27,13 +29,18 @@ export const EpisodeRow = memo(function EpisodeRow({
   onToggle,
   onWatchTillHere,
   busy,
+  unaired,
 }: EpisodeRowProps) {
   const still = stillUrl(stillPath ?? null);
+  // Only *block* an unaired episode that isn't already watched — a stray
+  // watched-but-unaired episode (imports, corrected air dates) must stay un-tickable.
+  const blocked = !!unaired && !watched;
 
   return (
-    <View className="flex-row items-center gap-2 py-2">
+    <View className={`flex-row items-center gap-2 py-2${blocked ? ' opacity-50' : ''}`}>
       <Pressable
-        onPress={() => onToggle(episodeNumber)}
+        onPress={() => (blocked ? undefined : onToggle(episodeNumber))}
+        disabled={blocked}
         className="flex-1 flex-row items-center gap-3 active:opacity-70">
         <View className="h-12 w-20 items-center justify-center overflow-hidden rounded-lg bg-neutral-200 dark:bg-neutral-800">
           {still ? (
@@ -62,7 +69,7 @@ export const EpisodeRow = memo(function EpisodeRow({
         </View>
       </Pressable>
 
-      {onWatchTillHere ? (
+      {onWatchTillHere && !blocked ? (
         <Pressable
           onPress={() => onWatchTillHere(episodeNumber)}
           disabled={busy}
@@ -78,13 +85,17 @@ export const EpisodeRow = memo(function EpisodeRow({
         </Pressable>
       ) : null}
 
-      <Pressable onPress={() => onToggle(episodeNumber)} hitSlop={6} className="active:opacity-60">
-        <Ionicons
-          name={watched ? 'checkmark-circle' : 'ellipse-outline'}
-          size={26}
-          color={watched ? COLORS.brand : COLORS.muted}
-        />
-      </Pressable>
+      {blocked ? (
+        <Ionicons name="time-outline" size={26} color={COLORS.muted} />
+      ) : (
+        <Pressable onPress={() => onToggle(episodeNumber)} hitSlop={6} className="active:opacity-60">
+          <Ionicons
+            name={watched ? 'checkmark-circle' : 'ellipse-outline'}
+            size={26}
+            color={watched ? COLORS.brand : COLORS.muted}
+          />
+        </Pressable>
+      )}
     </View>
   );
 });

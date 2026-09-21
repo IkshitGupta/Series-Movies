@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { queryKeys, useSeason, useShow } from '@/api/queries';
 import { getSeason } from '@/api/tmdb';
@@ -18,7 +18,7 @@ import { SelectChip } from '@/components/SelectChip';
 import { DetailHeaderSkeleton } from '@/components/Skeleton';
 import { Tag } from '@/components/Tag';
 import { WatchlistButton } from '@/components/WatchlistButton';
-import { getUpcoming, airedEpisodeCount, upcomingLabel } from '@/lib/airing';
+import { getUpcoming, airedEpisodeCount, hasEpisodeAired, upcomingLabel } from '@/lib/airing';
 import { tvToMediaItem } from '@/lib/normalize';
 import { getTvCertification, normalizeRecommendations } from '@/lib/tmdbExtras';
 import {
@@ -103,9 +103,19 @@ function SeasonEpisodes({
   }
 
   const episodes = season.episodes;
+  // Only aired episodes can be marked watched; "Mark all" ignores unaired ones so
+  // it can't complete a still-airing season. Unmarking clears everything (incl.
+  // any stray watched-but-unaired episode from an import).
+  const airedEpisodes = episodes.filter((ep) => hasEpisodeAired(ep.air_date));
+  // Completion is normally gated on aired episodes only. But if NOTHING in the
+  // season has aired yet (e.g. an import marked future episodes watched), fall
+  // back to "any episode watched" so those stray marks can still be bulk-cleared
+  // instead of leaving the Mark/Unmark button permanently disabled.
   const allWatched =
-    episodes.length > 0 &&
-    episodes.every((ep) => watchedSet.has(episodeKey(seasonNumber, ep.episode_number)));
+    airedEpisodes.length > 0
+      ? airedEpisodes.every((ep) => watchedSet.has(episodeKey(seasonNumber, ep.episode_number)))
+      : episodes.some((ep) => watchedSet.has(episodeKey(seasonNumber, ep.episode_number)));
+  const markNumbers = (allWatched ? episodes : airedEpisodes).map((ep) => ep.episode_number);
 
   return (
     <View className="px-4">
@@ -114,16 +124,12 @@ function SeasonEpisodes({
           Episodes
         </Text>
         <Pressable
+          disabled={markNumbers.length === 0}
           onPress={() =>
-            setSeasonEpisodes(
-              item,
-              totalEpisodes,
-              seasonNumber,
-              episodes.map((ep) => ep.episode_number),
-              !allWatched,
-            )
+            setSeasonEpisodes(item, totalEpisodes, seasonNumber, markNumbers, !allWatched)
           }
-          className="rounded-full bg-neutral-200 px-3 py-1 active:opacity-70 dark:bg-neutral-800">
+          className="rounded-full bg-neutral-200 px-3 py-1 active:opacity-70 dark:bg-neutral-800"
+          style={{ opacity: markNumbers.length === 0 ? 0.4 : 1 }}>
           <Text className="text-xs font-semibold text-brand">
             {allWatched ? 'Unmark all' : 'Mark all'}
           </Text>
@@ -145,6 +151,7 @@ function SeasonEpisodes({
           onToggle={handleToggle}
           onWatchTillHere={handleTill}
           busy={busy === episodeKey(seasonNumber, ep.episode_number)}
+          unaired={!hasEpisodeAired(ep.air_date)}
         />
       ))}
     </View>
@@ -162,6 +169,7 @@ export default function ShowDetailScreen() {
   const router = useRouter();
   const markEpisodesWatched = useLibraryStore((s) => s.markEpisodesWatched);
   const setShowStatus = useLibraryStore((s) => s.setShowStatus);
+  const untrackShow = useLibraryStore((s) => s.untrackShow);
   const syncShowMeta = useLibraryStore((s) => s.syncShowMeta);
   const [busy, setBusy] = useState<string | null>(null);
   // Memoized so the derived MediaItem keeps a stable identity across renders,
@@ -258,6 +266,9 @@ export default function ShowDetailScreen() {
         if (limit && sd.season_number === limit.season && ep.episode_number > limit.episode) {
           continue;
         }
+        // Skip unaired episodes so "mark whole series"/"watched up to here" can't
+        // mark episodes that haven't been released yet.
+        if (!hasEpisodeAired(ep.air_date)) continue;
         keys.push(episodeKey(sd.season_number, ep.episode_number));
       }
     }
@@ -403,6 +414,35 @@ export default function ShowDetailScreen() {
             <Text className="text-sm leading-5 text-neutral-600 dark:text-neutral-300">
               {show.overview}
             </Text>
+          </View>
+        ) : null}
+
+        {tracked ? (
+          <View className="px-4 pb-2">
+            <Pressable
+              onPress={() =>
+                Alert.alert(
+                  'Remove from library',
+                  `Remove “${show.name}” and its watched progress from your library? This syncs to your other devices.`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Remove',
+                      style: 'destructive',
+                      onPress: () => {
+                        untrackShow(showId);
+                        router.back();
+                      },
+                    },
+                  ],
+                )
+              }
+              className="flex-row items-center justify-center gap-2 rounded-xl border border-neutral-200 py-2 active:opacity-70 dark:border-neutral-800">
+              <Ionicons name="trash-outline" size={16} color="#dc2626" />
+              <Text className="text-sm font-semibold" style={{ color: '#dc2626' }}>
+                Remove from library
+              </Text>
+            </Pressable>
           </View>
         ) : null}
 

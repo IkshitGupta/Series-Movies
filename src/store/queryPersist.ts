@@ -1,4 +1,5 @@
 import { dehydrate, hydrate, type QueryClient } from '@tanstack/react-query';
+import { Platform } from 'react-native';
 
 import { storage } from '@/store/storage';
 
@@ -26,7 +27,13 @@ interface CacheEnvelope {
 }
 
 function isPersistableKey(key: readonly unknown[]): boolean {
-  return key[0] === 'movie' || key[0] === 'tv';
+  if (key[0] !== 'movie' && key[0] !== 'tv') return false;
+  // On web the whole query cache shares the ~5MB `localStorage` origin budget
+  // with the user library. Season payloads (full episode lists + stills) are by
+  // far the largest, so skip them on web to keep the library safely under quota;
+  // they're cheap to refetch and native (MMKV) has no such limit.
+  if (Platform.OS === 'web' && key[2] === 'season') return false;
+  return true;
 }
 
 /** Restore the persisted cache into `client`. Safe to call once at startup. */

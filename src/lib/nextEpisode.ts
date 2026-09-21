@@ -6,7 +6,7 @@ import type { QueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '@/api/queries';
 import { getSeason, getTv } from '@/api/tmdb';
-import { airedEpisodeCount } from '@/lib/airing';
+import { airedEpisodeCount, hasEpisodeAired, localTodayIso } from '@/lib/airing';
 import { episodeKey, type TmdbTvDetails } from '@/types';
 
 export interface NextEpisode {
@@ -29,14 +29,25 @@ export type NextUp =
  * episode is watched (so unaired future episodes aren't offered as "next").
  */
 export function nextUnwatchedEpisode(watchedEpisodes: string[], details: TmdbTvDetails): NextUp {
-  const aired = airedEpisodeCount(details) ?? details.number_of_episodes;
-  if (watchedEpisodes.length >= aired) return { kind: 'caught-up' };
+  // Prefer the exact aired count. Otherwise treat the show as fully-aired unless
+  // its premiere date is known and still in the future (only then is 0 correct);
+  // a show missing both `last_episode_to_air` and `first_air_date` falls back to
+  // its total rather than wrongly reporting "caught up".
+  const knownFuture = !!details.first_air_date && details.first_air_date > localTodayIso();
+  const aired = airedEpisodeCount(details) ?? (knownFuture ? 0 : details.number_of_episodes);
   const watched = new Set(watchedEpisodes);
   const seasons = details.seasons
     .filter((s) => s.season_number >= 1 && s.episode_count > 0)
     .sort((a, b) => a.season_number - b.season_number);
+  // Walk episodes in order but only within the aired window, so an inflated
+  // imported watched-count (TheTVDB split episodes TMDB merges) can't falsely
+  // report "caught up" while real aired episodes are still unwatched — and an
+  // unaired future episode is never offered as "next".
+  let seen = 0;
   for (const s of seasons) {
     for (let e = 1; e <= s.episode_count; e += 1) {
+      if (seen >= aired) return { kind: 'caught-up' };
+      seen += 1;
       if (!watched.has(episodeKey(s.season_number, e))) {
         return { kind: 'next', season: s.season_number, episode: e };
       }
@@ -80,6 +91,9 @@ export async function findNextEpisode(
 
     const episodes = [...season.episodes].sort((a, b) => a.episode_number - b.episode_number);
     for (const ep of episodes) {
+      // Never offer an unaired episode as "next" — you can't have watched it
+      // yet, and everything after it airs later, so we're caught up.
+      if (!hasEpisodeAired(ep.air_date)) return null;
       if (!watched.has(episodeKey(ep.season_number, ep.episode_number))) {
         return { season: ep.season_number, episode: ep.episode_number, runtime: ep.runtime };
       }

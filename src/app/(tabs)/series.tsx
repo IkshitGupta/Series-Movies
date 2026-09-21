@@ -14,7 +14,7 @@ import { airedEpisodeCount, getUpcoming, upcomingLabel } from '@/lib/airing';
 import { findNextEpisode, nextUnwatchedEpisode } from '@/lib/nextEpisode';
 import { DEFAULT_SORT, sortLibraryItems, type SortState } from '@/lib/sort';
 import { getShowProgress, getShowStatus, useLibraryStore } from '@/store/useLibraryStore';
-import type { MediaItem, ShowStatus, ShowUserStatus, TrackedShow } from '@/types';
+import { episodeKey, type MediaItem, type ShowStatus, type ShowUserStatus, type TrackedShow } from '@/types';
 
 import { COLORS } from '@/theme/colors';
 
@@ -124,15 +124,20 @@ function SeriesRow({
   // Surface where to resume: the next unwatched (aired) episode, e.g. "Next: S3·E5"
   // — the episode the Next button plays. Shows the plain count until the show's
   // detail loads (and for completed shows).
+  const nextUp =
+    status !== 'completed' && data ? nextUnwatchedEpisode(item.watchedEpisodes, data) : undefined;
   const progress = `${watched}${total ? `/${total}` : ''} episodes`;
   let subtitle = `${progress} watched`;
-  if (status !== 'completed' && data) {
-    const next = nextUnwatchedEpisode(item.watchedEpisodes, data);
+  if (nextUp) {
     subtitle =
-      next.kind === 'next'
-        ? `Next: S${next.season}·E${next.episode} · ${progress}`
+      nextUp.kind === 'next'
+        ? `Next: S${nextUp.season}·E${nextUp.episode} · ${progress}`
         : `Caught up · ${progress}`;
   }
+  // Once every aired episode is watched there's nothing to mark next, so show the
+  // status badge instead of a Next button that would otherwise target an unaired
+  // episode.
+  const showNext = canMarkNext && nextUp?.kind !== 'caught-up';
   return (
     <MediaCard
       item={item}
@@ -140,7 +145,7 @@ function SeriesRow({
       subtitle={subtitle}
       badge={upcoming ? upcomingLabel(upcoming) : undefined}
       right={
-        canMarkNext ? (
+        showNext ? (
           <MarkNextButton busy={busy} onPress={() => onMarkNext(item)} />
         ) : (
           <StatusBadge label={label} tone={tone} />
@@ -154,7 +159,7 @@ export default function SeriesScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const trackedShows = useLibraryStore((s) => s.trackedShows);
-  const toggleEpisode = useLibraryStore((s) => s.toggleEpisode);
+  const markEpisodesWatched = useLibraryStore((s) => s.markEpisodesWatched);
   const setShowEpisodeRuntime = useLibraryStore((s) => s.setShowEpisodeRuntime);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
@@ -185,8 +190,13 @@ export default function SeriesScreen() {
     setBusyId(show.id);
     try {
       const next = await findNextEpisode(queryClient, show.id, show.watchedEpisodes);
-      if (!next) return;
-      toggleEpisode(show, show.totalEpisodes, next.season, next.episode);
+      if (!next) {
+        Alert.alert('All caught up', 'You’ve watched every episode that has aired so far.');
+        return;
+      }
+      // Idempotent set-union (not a toggle) so a concurrent sync that already
+      // added this episode can't cause the tap to *un*-watch it.
+      markEpisodesWatched(show, show.totalEpisodes, [episodeKey(next.season, next.episode)]);
       if (!show.episodeRuntime && next.runtime && next.runtime > 0) {
         setShowEpisodeRuntime(show.id, next.runtime);
       }

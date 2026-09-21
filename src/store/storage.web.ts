@@ -13,10 +13,27 @@ import { createDebouncedStorage } from '@/store/persistDebounce';
 const memory = new Map<string, string>();
 const hasLocalStorage = typeof localStorage !== 'undefined';
 
+/** The disposable TMDB query cache (see `queryPersist.ts`). Evicted first when
+ * `localStorage` is full so the irreplaceable user library always wins space. */
+const QUERY_CACHE_KEY = 'tmdb-query-cache';
+
 const baseAdapter: StateStorage = {
   setItem: (name, value) => {
-    if (hasLocalStorage) localStorage.setItem(name, value);
-    else memory.set(name, value);
+    if (!hasLocalStorage) {
+      memory.set(name, value);
+      return;
+    }
+    try {
+      localStorage.setItem(name, value);
+    } catch (err) {
+      // Usually a QuotaExceededError — the ~5MB origin budget filled up (often by
+      // the TMDB query cache). Drop that disposable cache and retry once so the
+      // user's library persists. If it STILL fails, rethrow so the debounced
+      // storage layer re-queues and retries (rather than silently losing data).
+      if (name === QUERY_CACHE_KEY) throw err; // evicting the cache to save the cache is pointless
+      localStorage.removeItem(QUERY_CACHE_KEY);
+      localStorage.setItem(name, value);
+    }
   },
   getItem: (name) => {
     if (hasLocalStorage) return localStorage.getItem(name);
