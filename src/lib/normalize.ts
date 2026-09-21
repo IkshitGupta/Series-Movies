@@ -9,10 +9,10 @@ import type {
 } from '@/types';
 
 /** How many top-billed cast members to keep on a library item. Deep enough to
- * cover large ensemble casts (leads billed 9th–15th) without dredging up bit
- * parts; minor one-off actors still stay low in the stat since it ranks by how
- * many watched titles each appears in. */
-const MAX_CAST = 15;
+ * cover a title's leads/main supporting cast without dredging up bit parts;
+ * minor one-off actors still stay low in the stat since it ranks by how many
+ * watched titles each appears in. */
+export const MAX_CAST = 10;
 
 /** Extract a 4-digit year from a TMDB `YYYY-MM-DD` date string. */
 export function yearFromDate(date?: string | null): string | null {

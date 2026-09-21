@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { zustandStorage } from '@/store/storage';
+import { MAX_CAST } from '@/lib/normalize';
 import {
   emptyRevivals,
   emptyTombstones,
@@ -135,9 +136,10 @@ function ensureTracked(
     return {
       ...existing,
       totalEpisodes: totalEpisodes || existing.totalEpisodes,
-      // Backfill genres/cast if the show was first tracked before they were stored.
+      // Backfill genres/cast if the show was first tracked before they were
+      // stored; a real cast beats a stored empty `[]` (from a 404 backfill).
       genres: existing.genres ?? item.genres,
-      cast: existing.cast ?? item.cast,
+      cast: existing.cast?.length ? existing.cast : (item.cast ?? existing.cast),
     };
   }
   return {
@@ -853,9 +855,13 @@ export interface CastCount {
   count: number;
 }
 
+/** Cap on how many ranked actors the "Top actors & actresses" stat surfaces. */
+export const TOP_CAST_LIMIT = 150;
+
 /**
  * Rank actors across the watched library by how many watched titles each appears
- * in. `filter` scopes to movies only, shows only, or both.
+ * in. `filter` scopes to movies only, shows only, or both. Returns at most the
+ * top {@link TOP_CAST_LIMIT} actors.
  */
 export function getTopCast(
   watchedMovies: Record<number, WatchedMovie>,
@@ -864,7 +870,10 @@ export function getTopCast(
 ): CastCount[] {
   const counts = new Map<number, CastCount>();
   const tally = (cast?: CastCredit[]) => {
-    for (const c of cast ?? []) {
+    // Cap at the current top-billed limit so the ranking uses a uniform billing
+    // depth regardless of how many members an older/synced record happens to
+    // store (older items may hold more than the current `MAX_CAST`).
+    for (const c of (cast ?? []).slice(0, MAX_CAST)) {
       const existing = counts.get(c.id);
       if (existing) existing.count += 1;
       else counts.set(c.id, { id: c.id, name: c.name, count: 1 });
@@ -878,7 +887,9 @@ export function getTopCast(
       if (s.watchedEpisodes.length > 0) tally(s.cast);
     }
   }
-  return [...counts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  return [...counts.values()]
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, TOP_CAST_LIMIT);
 }
 
 /** Format a minutes total as "Xd Yh" / "Yh Zm" / "Zm". */

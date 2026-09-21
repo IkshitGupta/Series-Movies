@@ -11,6 +11,7 @@ import {
   getMovieStats,
   getShowStats,
   getTopCast,
+  TOP_CAST_LIMIT,
   type CastFilter,
   type MediaStats,
   useLibraryStore,
@@ -197,7 +198,10 @@ function TopCastSection() {
             <Pressable
               key={c.id}
               onPress={() =>
-                router.push({ pathname: '/person/[id]', params: { id: String(c.id), name: c.name } })
+                router.push({
+                  pathname: '/person/[id]',
+                  params: { id: String(c.id), name: c.name, filter },
+                })
               }
               className="gap-1 active:opacity-60">
               <View className="flex-row items-center justify-between">
@@ -222,7 +226,11 @@ function TopCastSection() {
               accessibilityRole="button"
               className="flex-row items-center justify-center gap-1 pt-1 active:opacity-60">
               <Text className="text-sm font-semibold text-brand">
-                {expanded ? 'Show less' : `Show all ${cast.length}`}
+                {expanded
+                  ? 'Show less'
+                  : cast.length >= TOP_CAST_LIMIT
+                    ? `Show top ${TOP_CAST_LIMIT}`
+                    : `Show all ${cast.length}`}
               </Text>
               <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.brand} />
             </Pressable>

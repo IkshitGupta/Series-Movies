@@ -1,6 +1,7 @@
 import {
   episodeTombstoneKey,
   mediaKey,
+  type CastCredit,
   type Revivals,
   type Tombstones,
   type TrackedShow,
@@ -115,6 +116,20 @@ function mergeRevivals(
   };
 }
 
+/** Merge two cast lists symmetrically. Prefer a non-empty side so an empty `[]`
+ * (written when a title 404s on TMDB during backfill) can never wipe a real cast
+ * another device fetched; then prefer the more complete list (TMDB can grow a
+ * title's credits over time); on an equal length pick deterministically by the
+ * id+name sequence. Order-independent → the chosen `cast` is the same regardless
+ * of merge direction (commutative). */
+const castKey = (c?: CastCredit[]) => (c ?? []).map((x) => `${x.id}\u0000${x.name}`).join('\u0001');
+function pickCast(a?: CastCredit[], b?: CastCredit[]): CastCredit[] | undefined {
+  if (!a || a.length === 0) return b ?? a;
+  if (!b || b.length === 0) return a;
+  if (a.length !== b.length) return a.length > b.length ? a : b;
+  return castKey(a) <= castKey(b) ? a : b;
+}
+
 /** Deterministic, symmetric rank of a movie's display fields, so two devices
  * with divergent metadata (e.g. a locale/fetch-time title variant) converge on
  * the same winner instead of each keeping its own and ping-ponging every sync. */
@@ -151,7 +166,7 @@ function mergeMovies(
       watchedAt: Math.min(other.watchedAt, m.watchedAt),
       // Keep whichever side has each optional value so a fetch/backfill on one
       // device isn't dropped just because the winner hasn't got it yet.
-      cast: winner.cast ?? loser.cast,
+      cast: pickCast(winner.cast, loser.cast),
       runtime: winner.runtime ?? loser.runtime,
       genres: winner.genres ?? loser.genres,
       posterPath: winner.posterPath ?? loser.posterPath,
@@ -210,7 +225,7 @@ function mergeShows(
       userStatus: newer.userStatus,
       // Keep whichever side has each optional metadata value so a fetch/backfill
       // on one device isn't dropped just because the newer side hasn't got it yet.
-      cast: newer.cast ?? older.cast,
+      cast: pickCast(newer.cast, older.cast),
       totalEpisodes: newer.totalEpisodes || older.totalEpisodes,
       airedEpisodes: newer.airedEpisodes ?? older.airedEpisodes,
       episodeRuntime: newer.episodeRuntime ?? older.episodeRuntime,
