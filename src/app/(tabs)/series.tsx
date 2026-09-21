@@ -11,7 +11,7 @@ import { SelectChip } from '@/components/SelectChip';
 import { SortBar } from '@/components/SortBar';
 import { StatusBadge } from '@/components/StatusBadge';
 import { airedEpisodeCount, getUpcoming, upcomingLabel } from '@/lib/airing';
-import { findNextEpisode } from '@/lib/nextEpisode';
+import { findNextEpisode, nextUnwatchedEpisode } from '@/lib/nextEpisode';
 import { DEFAULT_SORT, sortLibraryItems, type SortState } from '@/lib/sort';
 import { getShowProgress, getShowStatus, useLibraryStore } from '@/store/useLibraryStore';
 import type { MediaItem, ShowStatus, ShowUserStatus, TrackedShow } from '@/types';
@@ -121,11 +121,23 @@ function SeriesRow({
       : 'brand';
   const canMarkNext = tvFilter === 'watching' || tvFilter === 'continue_later';
   const upcoming = getUpcoming(data);
+  // Surface where to resume: the next unwatched (aired) episode, e.g. "Next: S3·E5"
+  // — the episode the Next button plays. Shows the plain count until the show's
+  // detail loads (and for completed shows).
+  const progress = `${watched}${total ? `/${total}` : ''} episodes`;
+  let subtitle = `${progress} watched`;
+  if (status !== 'completed' && data) {
+    const next = nextUnwatchedEpisode(item.watchedEpisodes, data);
+    subtitle =
+      next.kind === 'next'
+        ? `Next: S${next.season}·E${next.episode} · ${progress}`
+        : `Caught up · ${progress}`;
+  }
   return (
     <MediaCard
       item={item}
       onPress={() => onOpen(item)}
-      subtitle={`${watched}${total ? `/${total}` : ''} episodes watched`}
+      subtitle={subtitle}
       badge={upcoming ? upcomingLabel(upcoming) : undefined}
       right={
         canMarkNext ? (

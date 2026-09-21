@@ -6,13 +6,43 @@ import type { QueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '@/api/queries';
 import { getSeason, getTv } from '@/api/tmdb';
-import { episodeKey } from '@/types';
+import { airedEpisodeCount } from '@/lib/airing';
+import { episodeKey, type TmdbTvDetails } from '@/types';
 
 export interface NextEpisode {
   season: number;
   episode: number;
   /** Episode runtime in minutes (from TMDB), or null if unknown. */
   runtime: number | null;
+}
+
+/** The show is up to date on everything aired so far (nothing new to watch yet). */
+export type NextUp =
+  | { kind: 'next'; season: number; episode: number }
+  | { kind: 'caught-up' };
+
+/**
+ * Cheap, synchronous "next unwatched aired episode" for the Series list — derived
+ * from the show's season summaries (episode counts), so it needs no extra fetch
+ * beyond the detail the row already loads. Matches the async {@link findNextEpisode}
+ * for standard 1..N episode numbering. Returns `caught-up` once every *aired*
+ * episode is watched (so unaired future episodes aren't offered as "next").
+ */
+export function nextUnwatchedEpisode(watchedEpisodes: string[], details: TmdbTvDetails): NextUp {
+  const aired = airedEpisodeCount(details) ?? details.number_of_episodes;
+  if (watchedEpisodes.length >= aired) return { kind: 'caught-up' };
+  const watched = new Set(watchedEpisodes);
+  const seasons = details.seasons
+    .filter((s) => s.season_number >= 1 && s.episode_count > 0)
+    .sort((a, b) => a.season_number - b.season_number);
+  for (const s of seasons) {
+    for (let e = 1; e <= s.episode_count; e += 1) {
+      if (!watched.has(episodeKey(s.season_number, e))) {
+        return { kind: 'next', season: s.season_number, episode: e };
+      }
+    }
+  }
+  return { kind: 'caught-up' };
 }
 
 /**
