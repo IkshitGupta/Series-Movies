@@ -5,6 +5,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { zustandStorage } from '@/store/storage';
 import {
   episodeKey,
+  type CastCredit,
   type MediaItem,
   type ShowStatus,
   type ShowUserStatus,
@@ -92,6 +93,11 @@ interface LibraryState {
    * newly-aired episodes changing the released count). */
   syncShowMeta: (id: number, meta: { totalEpisodes?: number; airedEpisodes?: number }) => void;
   untrackShow: (id: number) => void;
+
+  // --- Cast backfill ---
+  /** Set/replace the stored top cast for an existing watched movie or tracked
+   * show (used by the one-time cast backfill). No-op if the item isn't present. */
+  setItemCast: (mediaType: MediaItem['mediaType'], id: number, cast: CastCredit[]) => void;
 }
 
 function isSame(item: WatchlistItem, mediaType: MediaItem['mediaType'], id: number): boolean {
@@ -108,8 +114,9 @@ function ensureTracked(
     return {
       ...existing,
       totalEpisodes: totalEpisodes || existing.totalEpisodes,
-      // Backfill genres if the show was first tracked before genres were stored.
+      // Backfill genres/cast if the show was first tracked before they were stored.
       genres: existing.genres ?? item.genres,
+      cast: existing.cast ?? item.cast,
     };
   }
   return {
@@ -413,6 +420,18 @@ export const useLibraryStore = create<LibraryState>()(
           delete next[id];
           return { trackedShows: next };
         }),
+
+      setItemCast: (mediaType, id, cast) =>
+        set((state) => {
+          if (mediaType === 'movie') {
+            const movie = state.watchedMovies[id];
+            if (!movie) return state;
+            return { watchedMovies: { ...state.watchedMovies, [id]: { ...movie, cast } } };
+          }
+          const show = state.trackedShows[id];
+          if (!show) return state;
+          return { trackedShows: { ...state.trackedShows, [id]: { ...show, cast } } };
+        }),
     }),
     {
       name: 'library-store',
@@ -531,6 +550,44 @@ export function getShowStats(trackedShows: Record<number, TrackedShow>): MediaSt
     0,
   );
   return { total: items.length, episodes, runtimeMinutes, genres: tallyGenres(items) };
+}
+
+/** Which part of the watched library the actor stat is scoped to. */
+export type CastFilter = 'all' | 'movie' | 'tv';
+
+export interface CastCount {
+  id: number;
+  name: string;
+  /** Number of watched titles (in scope) the actor appears in. */
+  count: number;
+}
+
+/**
+ * Rank actors across the watched library by how many watched titles each appears
+ * in. `filter` scopes to movies only, shows only, or both.
+ */
+export function getTopCast(
+  watchedMovies: Record<number, WatchedMovie>,
+  trackedShows: Record<number, TrackedShow>,
+  filter: CastFilter,
+): CastCount[] {
+  const counts = new Map<number, CastCount>();
+  const tally = (cast?: CastCredit[]) => {
+    for (const c of cast ?? []) {
+      const existing = counts.get(c.id);
+      if (existing) existing.count += 1;
+      else counts.set(c.id, { id: c.id, name: c.name, count: 1 });
+    }
+  };
+  if (filter !== 'tv') {
+    for (const m of Object.values(watchedMovies)) tally(m.cast);
+  }
+  if (filter !== 'movie') {
+    for (const s of Object.values(trackedShows)) {
+      if (s.watchedEpisodes.length > 0) tally(s.cast);
+    }
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
 /** Format a minutes total as "Xd Yh" / "Yh Zm" / "Zm". */

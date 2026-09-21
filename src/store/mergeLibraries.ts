@@ -31,7 +31,7 @@ function mergeMovies(
   for (const m of Object.values(local)) {
     const other = out[m.id];
     out[m.id] = other
-      ? { ...other, ...m, watchedAt: Math.min(other.watchedAt, m.watchedAt) }
+      ? { ...other, ...m, watchedAt: Math.min(other.watchedAt, m.watchedAt), cast: m.cast ?? other.cast }
       : m;
   }
   return out;
@@ -61,6 +61,8 @@ function mergeShows(
       // Explicit so a cleared (undefined) status on the newer side is NOT
       // resurrected from the older side by the object spread above.
       userStatus: newer.userStatus,
+      // Metadata: keep whichever side has cast so a backfill isn't lost on merge.
+      cast: newer.cast ?? older.cast,
       lastUpdated: Math.max(l.lastUpdated ?? 0, r.lastUpdated ?? 0),
     };
   }

@@ -13,6 +13,15 @@ export interface MediaItem {
   year: string | null;
   /** Genre names. Populated from detail responses; absent for search results. */
   genres?: string[];
+  /** Top billed cast (from detail credits). Populated when a title is
+   * watched/tracked or imported; used for the "Top actors & actresses" stat. */
+  cast?: CastCredit[];
+}
+
+/** A single cast member stored on a library item (top-billed, trimmed down). */
+export interface CastCredit {
+  id: number;
+  name: string;
 }
 
 /** An item on the single "To Watch" list. */

@@ -23,6 +23,7 @@ import {
   searchMovieByTitle,
   TmdbError,
 } from '@/api/tmdb';
+import { topCast } from '@/lib/normalize';
 import {
   episodeKey,
   type MediaItem,
@@ -381,6 +382,7 @@ export async function resolveLibrary(
         posterPath: d.poster_path,
         year: d.release_date ? d.release_date.slice(0, 4) : m.year != null ? String(m.year) : null,
         genres: d.genres?.map((g) => g.name) ?? [],
+        cast: topCast(d),
       };
       if (m.isWatched) {
         movies[movieId] = {
@@ -440,6 +442,7 @@ export async function resolveLibrary(
         posterPath: d.poster_path,
         year: d.first_air_date ? d.first_air_date.slice(0, 4) : null,
         genres: d.genres?.map((g) => g.name) ?? [],
+        cast: topCast(d),
       };
       if (s.hasWatched) {
         const episodeRuntime = await resolveEpisodeRuntime(tmdbId, d, s.firstWatchedSeason);

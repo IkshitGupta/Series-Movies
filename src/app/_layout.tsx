@@ -93,6 +93,7 @@ export default function RootLayout() {
                 <Stack.Screen name="movie/[id]" options={{ title: 'Movie' }} />
                 <Stack.Screen name="show/[id]" options={{ title: 'Show' }} />
                 <Stack.Screen name="genre/[type]" options={{ title: 'Genre' }} />
+                <Stack.Screen name="person/[id]" options={{ title: 'Cast' }} />
                 <Stack.Screen name="keyword/[id]" options={{ title: 'Theme' }} />
               </Stack>
             </WebFrame>

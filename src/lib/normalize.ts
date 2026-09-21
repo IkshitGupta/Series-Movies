@@ -1,14 +1,37 @@
 import type {
+  CastCredit,
   MediaItem,
+  TmdbCastMember,
   TmdbDiscoverItem,
   TmdbMovieDetails,
   TmdbSearchItem,
   TmdbTvDetails,
 } from '@/types';
 
+/** How many top-billed cast members to keep on a library item. Deep enough to
+ * cover large ensemble casts (leads billed 9th–15th) without dredging up bit
+ * parts; minor one-off actors still stay low in the stat since it ranks by how
+ * many watched titles each appears in. */
+const MAX_CAST = 15;
+
 /** Extract a 4-digit year from a TMDB `YYYY-MM-DD` date string. */
 export function yearFromDate(date?: string | null): string | null {
   return date ? date.slice(0, 4) || null : null;
+}
+
+/** Top-billed cast from a detail response, trimmed to id + name (deduped). */
+export function topCast(detail: { credits?: { cast?: TmdbCastMember[] } }): CastCredit[] | undefined {
+  const cast = detail.credits?.cast;
+  if (!cast || cast.length === 0) return undefined;
+  const seen = new Set<number>();
+  const out: CastCredit[] = [];
+  for (const c of cast) {
+    if (!c || !c.name || seen.has(c.id)) continue;
+    seen.add(c.id);
+    out.push({ id: c.id, name: c.name });
+    if (out.length >= MAX_CAST) break;
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 /** Normalize a `/search/multi` result, dropping people. */
@@ -31,6 +54,7 @@ export function movieToMediaItem(movie: TmdbMovieDetails): MediaItem {
     posterPath: movie.poster_path,
     year: yearFromDate(movie.release_date),
     genres: movie.genres.map((g) => g.name),
+    cast: topCast(movie),
   };
 }
 
@@ -42,6 +66,7 @@ export function tvToMediaItem(show: TmdbTvDetails): MediaItem {
     posterPath: show.poster_path,
     year: yearFromDate(show.first_air_date),
     genres: show.genres.map((g) => g.name),
+    cast: topCast(show),
   };
 }
 
