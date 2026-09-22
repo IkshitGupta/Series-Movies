@@ -22,6 +22,7 @@ import { getUpcoming, airedEpisodeCount, hasEpisodeAired, upcomingLabel } from '
 import { tvToMediaItem } from '@/lib/normalize';
 import { getTvCertification, normalizeRecommendations } from '@/lib/tmdbExtras';
 import {
+  formatWatchTime,
   getShowStatus,
   useLibraryStore,
   useTrackedShow,
@@ -103,6 +104,11 @@ function SeasonEpisodes({
   }
 
   const episodes = season.episodes;
+  // Total runtime of this season's *aired* episodes (matches the per-episode
+  // subtitles, which only show a runtime once an episode has aired).
+  const seasonRuntime = episodes
+    .filter((ep) => hasEpisodeAired(ep.air_date))
+    .reduce((sum, ep) => sum + (ep.runtime ?? 0), 0);
   // Only aired episodes can be marked watched; "Mark all" ignores unaired ones so
   // it can't complete a still-airing season. Unmarking clears everything (incl.
   // any stray watched-but-unaired episode from an import).
@@ -120,9 +126,16 @@ function SeasonEpisodes({
   return (
     <View className="px-4">
       <View className="flex-row items-center justify-between py-2">
-        <Text className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
-          Episodes
-        </Text>
+        <View className="flex-row items-baseline gap-2">
+          <Text className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
+            Episodes
+          </Text>
+          {seasonRuntime > 0 ? (
+            <Text className="text-xs text-neutral-400 dark:text-neutral-500">
+              {formatWatchTime(seasonRuntime)}
+            </Text>
+          ) : null}
+        </View>
         <Pressable
           disabled={markNumbers.length === 0}
           onPress={() =>
@@ -145,7 +158,13 @@ function SeasonEpisodes({
           key={ep.id}
           episodeNumber={ep.episode_number}
           title={ep.name}
-          subtitle={ep.air_date ?? undefined}
+          subtitle={
+            hasEpisodeAired(ep.air_date)
+              ? ep.runtime
+                ? formatWatchTime(ep.runtime)
+                : (ep.air_date ?? undefined)
+              : (ep.air_date ?? undefined)
+          }
           stillPath={ep.still_path}
           watched={watchedSet.has(episodeKey(seasonNumber, ep.episode_number))}
           onToggle={handleToggle}
@@ -212,6 +231,10 @@ export default function ShowDetailScreen() {
   if (!memoItem) return null;
   const item = memoItem;
   const total = show.number_of_episodes;
+  // Best-effort whole-show runtime: per-episode runtime (from the show, or the
+  // avg we stored when a season was viewed) × episode count. Shown as an estimate.
+  const perEpisodeRuntime = show.episode_run_time?.[0] || tracked?.episodeRuntime || 0;
+  const showRuntimeTotal = perEpisodeRuntime > 0 ? perEpisodeRuntime * total : 0;
   // Episodes released so far — the denominator for progress (excludes unaired).
   const airedTotal = airedEpisodeCount(show) ?? total;
   const seasons = show.seasons.filter((s) => s.season_number >= 1 && s.episode_count > 0);
@@ -319,7 +342,11 @@ export default function ShowDetailScreen() {
               </Text>
               <View className="flex-row flex-wrap items-center gap-2">
                 <Text className="text-sm text-neutral-500 dark:text-neutral-400">
-                  {[item.year, `${show.number_of_seasons} season${show.number_of_seasons === 1 ? '' : 's'}`]
+                  {[
+                    item.year,
+                    `${show.number_of_seasons} season${show.number_of_seasons === 1 ? '' : 's'}`,
+                    showRuntimeTotal > 0 ? `~${formatWatchTime(showRuntimeTotal)}` : null,
+                  ]
                     .filter(Boolean)
                     .join('  •  ')}
                 </Text>

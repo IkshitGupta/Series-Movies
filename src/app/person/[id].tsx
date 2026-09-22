@@ -4,7 +4,7 @@ import { FlatList, View } from 'react-native';
 
 import { EmptyState } from '@/components/EmptyState';
 import { MediaCard } from '@/components/MediaCard';
-import { useLibraryStore } from '@/store/useLibraryStore';
+import { useLibraryStore, showCastForStat } from '@/store/useLibraryStore';
 import { MAX_CAST } from '@/lib/normalize';
 import type { MediaItem, TrackedShow, WatchedMovie } from '@/types';
 
@@ -17,15 +17,18 @@ export default function PersonScreen() {
   const trackedShows = useLibraryStore((s) => s.trackedShows);
 
   const items = useMemo<(WatchedMovie | TrackedShow)[]>(() => {
-    const has = (item: { cast?: { id: number }[] }) =>
-      item.cast?.slice(0, MAX_CAST).some((c) => c.id === personId) ?? false;
+    const movieHas = (m: WatchedMovie) =>
+      m.cast?.slice(0, MAX_CAST).some((c) => c.id === personId) ?? false;
     // Honour the scope the actor was tapped from: the "TV" filter should never
-    // list movies (and vice-versa), matching the count shown in the stat.
-    const movies = filter === 'tv' ? [] : Object.values(watchedMovies).filter(has);
+    // list movies (and vice-versa), matching the count shown in the stat. Shows
+    // are matched on the seasons actually watched (same rule as the stat).
+    const movies = filter === 'tv' ? [] : Object.values(watchedMovies).filter(movieHas);
     const shows =
       filter === 'movie'
         ? []
-        : Object.values(trackedShows).filter((s) => s.watchedEpisodes.length > 0 && has(s));
+        : Object.values(trackedShows).filter(
+            (s) => s.watchedEpisodes.length > 0 && showCastForStat(s).some((c) => c.id === personId),
+          );
     // Combined list, most recent first (movies by watchedAt, shows by lastUpdated).
     return [...movies, ...shows].sort((a, b) => {
       const at = 'watchedAt' in a ? a.watchedAt : a.lastUpdated;

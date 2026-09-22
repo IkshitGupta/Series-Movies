@@ -130,6 +130,24 @@ function pickCast(a?: CastCredit[], b?: CastCredit[]): CastCredit[] | undefined 
   return castKey(a) <= castKey(b) ? a : b;
 }
 
+/** Union two per-season cast maps, resolving each season with `pickCast` so the
+ * result is order-independent (commutative) and empty/short seasons never wipe a
+ * fetched one. Absent on a side → keep the other side. */
+function mergeCastBySeason(
+  a?: Record<number, CastCredit[]>,
+  b?: Record<number, CastCredit[]>,
+): Record<number, CastCredit[]> | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const out: Record<number, CastCredit[]> = {};
+  const seasons = new Set<number>([...Object.keys(a), ...Object.keys(b)].map(Number));
+  for (const s of seasons) {
+    const picked = pickCast(a[s], b[s]);
+    if (picked) out[s] = picked;
+  }
+  return out;
+}
+
 /** Deterministic, symmetric rank of a movie's display fields, so two devices
  * with divergent metadata (e.g. a locale/fetch-time title variant) converge on
  * the same winner instead of each keeping its own and ping-ponging every sync. */
@@ -226,6 +244,7 @@ function mergeShows(
       // Keep whichever side has each optional metadata value so a fetch/backfill
       // on one device isn't dropped just because the newer side hasn't got it yet.
       cast: pickCast(newer.cast, older.cast),
+      castBySeason: mergeCastBySeason(newer.castBySeason, older.castBySeason),
       totalEpisodes: newer.totalEpisodes || older.totalEpisodes,
       airedEpisodes: newer.airedEpisodes ?? older.airedEpisodes,
       episodeRuntime: newer.episodeRuntime ?? older.episodeRuntime,

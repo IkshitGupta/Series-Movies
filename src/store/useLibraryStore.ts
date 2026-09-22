@@ -10,6 +10,7 @@ import {
   episodeKey,
   episodeTombstoneKey,
   mediaKey,
+  seasonFromEpisodeKey,
   type CastCredit,
   type MediaItem,
   type Revivals,
@@ -44,6 +45,10 @@ interface LibraryState {
    * when the library is anonymous (never signed in). Device-local bookkeeping —
    * never uploaded — used to keep two accounts' libraries from mixing. */
   ownerId: string | null;
+  /** Device-local marker of which cast-selection rule the stored cast was built
+   * with. Bumped when the rule changes so the backfill re-fetches every title's
+   * cast once. Never synced (each device migrates its own cache). */
+  castRuleVersion?: number;
 
   // --- Appearance ---
   setTheme: (theme: ThemePref) => void;
@@ -120,6 +125,13 @@ interface LibraryState {
   setItemsCast: (
     updates: { mediaType: MediaItem['mediaType']; id: number; cast: CastCredit[] }[],
   ) => void;
+  /** Bulk-set a tracked show's per-season cast (`castBySeason[season]`), used by
+   * the cast backfill to attribute the actor stat to watched seasons only.
+   * Merges into any existing seasons; no-op for shows that aren't present. */
+  setSeasonCasts: (updates: { showId: number; season: number; cast: CastCredit[] }[]) => void;
+  /** Record that the stored cast is now built with the given selection-rule
+   * version (set by the backfill once a re-selection pass completes). */
+  setCastRuleVersion: (version: number) => void;
 }
 
 function isSame(item: WatchlistItem, mediaType: MediaItem['mediaType'], id: number): boolean {
@@ -680,6 +692,28 @@ export const useLibraryStore = create<LibraryState>()(
             ...(showsChanged ? { trackedShows: shows } : {}),
           };
         }),
+
+      setSeasonCasts: (updates) =>
+        set((state) => {
+          if (updates.length === 0) return state;
+          let shows = state.trackedShows;
+          let changed = false;
+          for (const u of updates) {
+            const show = shows[u.showId];
+            if (!show) continue;
+            if (!changed) {
+              shows = { ...shows };
+              changed = true;
+            }
+            shows[u.showId] = {
+              ...show,
+              castBySeason: { ...show.castBySeason, [u.season]: u.cast },
+            };
+          }
+          return changed ? { trackedShows: shows } : state;
+        }),
+
+      setCastRuleVersion: (version) => set({ castRuleVersion: version }),
     }),
     {
       name: 'library-store',
@@ -696,6 +730,7 @@ export const useLibraryStore = create<LibraryState>()(
         onboarded: state.onboarded,
         theme: state.theme,
         ownerId: state.ownerId,
+        castRuleVersion: state.castRuleVersion,
       }),
       // v2 narrowed ShowUserStatus; v3 also drops "dangling" shows that ended
       // up with no episode progress and no manual status; v4 adds `onboarded`
@@ -859,6 +894,38 @@ export interface CastCount {
 export const TOP_CAST_LIMIT = 150;
 
 /**
+ * The cast to attribute a tracked show to in the actor stat: the de-duped union
+ * of the top-billed cast of each season the user has watched ≥1 episode of (so an
+ * actor who only appears in seasons you haven't watched isn't counted). Each
+ * season is capped to {@link MAX_CAST}. Falls back to the series-level `cast` when
+ * no per-season data has been fetched yet (older records / before the backfill),
+ * so the stat degrades gracefully rather than emptying out.
+ */
+export function showCastForStat(show: TrackedShow): CastCredit[] {
+  const bySeason = show.castBySeason;
+  if (!bySeason) return (show.cast ?? []).slice(0, MAX_CAST);
+  const watchedSeasons = new Set<number>();
+  for (const key of show.watchedEpisodes) {
+    const s = seasonFromEpisodeKey(key);
+    if (s != null) watchedSeasons.add(s);
+  }
+  const seen = new Set<number>();
+  const out: CastCredit[] = [];
+  for (const season of watchedSeasons) {
+    for (const c of (bySeason[season] ?? []).slice(0, MAX_CAST)) {
+      if (!seen.has(c.id)) {
+        seen.add(c.id);
+        out.push(c);
+      }
+    }
+  }
+  // Fall back to the series-level cast when no watched season has any stored
+  // cast yet (e.g. only specials watched, or an import's season numbers 404 →
+  // `[]`), so the show still contributes instead of silently vanishing.
+  return out.length > 0 ? out : (show.cast ?? []).slice(0, MAX_CAST);
+}
+
+/**
  * Rank actors across the watched library by how many watched titles each appears
  * in. `filter` scopes to movies only, shows only, or both. Returns at most the
  * top {@link TOP_CAST_LIMIT} actors.
@@ -869,22 +936,22 @@ export function getTopCast(
   filter: CastFilter,
 ): CastCount[] {
   const counts = new Map<number, CastCount>();
-  const tally = (cast?: CastCredit[]) => {
-    // Cap at the current top-billed limit so the ranking uses a uniform billing
-    // depth regardless of how many members an older/synced record happens to
-    // store (older items may hold more than the current `MAX_CAST`).
-    for (const c of (cast ?? []).slice(0, MAX_CAST)) {
+  const bump = (cast: CastCredit[]) => {
+    for (const c of cast) {
       const existing = counts.get(c.id);
       if (existing) existing.count += 1;
       else counts.set(c.id, { id: c.id, name: c.name, count: 1 });
     }
   };
   if (filter !== 'tv') {
-    for (const m of Object.values(watchedMovies)) tally(m.cast);
+    // Movies: cap to the current top-billed limit (older records may hold more).
+    for (const m of Object.values(watchedMovies)) bump((m.cast ?? []).slice(0, MAX_CAST));
   }
   if (filter !== 'movie') {
+    // Shows: attribute only the cast of the seasons actually watched (already
+    // per-season capped + de-duped by `showCastForStat`), still +1 per title.
     for (const s of Object.values(trackedShows)) {
-      if (s.watchedEpisodes.length > 0) tally(s.cast);
+      if (s.watchedEpisodes.length > 0) bump(showCastForStat(s));
     }
   }
   return [...counts.values()]

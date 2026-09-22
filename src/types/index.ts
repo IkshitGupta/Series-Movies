@@ -56,6 +56,10 @@ export interface TrackedShow extends MediaItem {
   userStatus?: ShowUserStatus;
   /** Typical episode runtime in minutes (from TMDB), for total watch-time stats. */
   episodeRuntime?: number;
+  /** Top-billed cast per season (from TMDB season credits), keyed by season
+   * number. Lets the actor stat attribute a show only for the seasons you've
+   * actually watched. Filled lazily in the background by the cast backfill. */
+  castBySeason?: Record<number, CastCredit[]>;
 }
 
 export type ShowStatus = 'not_started' | 'watching' | 'completed';
@@ -72,6 +76,12 @@ export type ThemePref = 'system' | 'light' | 'dark';
 /** Stable key for a single episode, e.g. `S1E4`. */
 export function episodeKey(seasonNumber: number, episodeNumber: number): string {
   return `S${seasonNumber}E${episodeNumber}`;
+}
+
+/** Extract the season number from an {@link episodeKey} (e.g. `S3E4` → 3). */
+export function seasonFromEpisodeKey(key: string): number | null {
+  const m = /^S(\d+)E/.exec(key);
+  return m ? Number(m[1]) : null;
 }
 
 /** Composite key so a movie and a show can share a numeric TMDB id. */
@@ -195,6 +205,15 @@ export interface TmdbCastMember {
   name: string;
   character: string;
   profile_path: string | null;
+  /** Billing/credit order (0 = top-billed). */
+  order?: number;
+  /** TMDB global popularity of the person (volatile trending score). */
+  popularity?: number;
+}
+
+/** A credits response (e.g. `/tv/{id}/season/{n}/credits`). */
+export interface TmdbCredits {
+  cast: TmdbCastMember[];
 }
 
 export interface TmdbCompany {

@@ -1,18 +1,19 @@
 import { create } from 'zustand';
 
-import { getMovie, getTv, hasApiKey, TmdbError } from '@/api/tmdb';
+import { getMovie, getSeasonCredits, hasApiKey, TmdbError } from '@/api/tmdb';
 import { topCast } from '@/lib/normalize';
+import { withRetry } from '@/lib/retry';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import type { CastCredit } from '@/types';
+import { seasonFromEpisodeKey, type CastCredit } from '@/types';
 
 /**
- * One-time backfill of top cast for watched titles saved before cast was tracked
- * (or from imports). Cast only comes from a TMDB detail response, so titles added
- * before this feature have no cast — this fills them in the background so the
- * "Top actors & actresses" stat covers the whole existing library.
+ * Background backfill of the cast used by the "Top actors & actresses" stat:
+ * - movies → the top-billed cast from the movie detail (stored on `cast`);
+ * - shows → the top-billed cast of each *watched* season (stored on
+ *   `castBySeason[season]`), so an actor is attributed only for seasons watched.
  *
- * `cast === undefined` means "never fetched" (a candidate); after a fetch we store
- * the cast (or `[]` when a title genuinely has none) so it isn't retried forever.
+ * A stored value (even `[]`, written when a title/season 404s) marks it fetched
+ * so it isn't retried forever; a missing value is a candidate.
  */
 
 interface BackfillStatus {
@@ -27,70 +28,115 @@ export const useCastBackfillStatus = create<BackfillStatus>(() => ({
 
 let inFlight = false;
 
-interface Target {
-  mediaType: 'movie' | 'tv';
-  id: number;
-}
+/** Selection-rule version the stored cast should be built with. Bump when the
+ * cast-selection logic in `topCast` changes, to trigger a one-time re-fetch. */
+const CAST_RULE_VERSION = 2;
 
-function findMissing(): Target[] {
+type Target =
+  | { kind: 'movie'; id: number }
+  | { kind: 'season'; showId: number; season: number };
+
+function findTargets(migrating: boolean): Target[] {
   const s = useLibraryStore.getState();
   const targets: Target[] = [];
   for (const m of Object.values(s.watchedMovies)) {
-    if (m.cast === undefined) targets.push({ mediaType: 'movie', id: m.id });
+    if (migrating || m.cast === undefined) targets.push({ kind: 'movie', id: m.id });
   }
   for (const show of Object.values(s.trackedShows)) {
-    if (show.watchedEpisodes.length > 0 && show.cast === undefined) {
-      targets.push({ mediaType: 'tv', id: show.id });
+    if (show.watchedEpisodes.length === 0) continue;
+    const bySeason = show.castBySeason ?? {};
+    const seen = new Set<number>();
+    for (const key of show.watchedEpisodes) {
+      const season = seasonFromEpisodeKey(key);
+      if (season == null || seen.has(season)) continue;
+      seen.add(season);
+      if (migrating || bySeason[season] === undefined) {
+        targets.push({ kind: 'season', showId: show.id, season });
+      }
     }
   }
   return targets;
 }
 
-/** Fetch + store missing cast with bounded concurrency. Safe to call repeatedly. */
+/** Fetch + store missing cast (movies + watched seasons) with bounded
+ * concurrency. Safe to call repeatedly. When the selection rule changed
+ * (`castRuleVersion` behind), it re-fetches every title once to re-select cast. */
 export async function runCastBackfill(): Promise<void> {
   if (inFlight || !hasApiKey()) return;
-  const targets = findMissing();
+  const owner = useLibraryStore.getState().ownerId;
+  const migrating = (useLibraryStore.getState().castRuleVersion ?? 1) < CAST_RULE_VERSION;
+  const targets = findTargets(migrating);
+  // Empty library: leave the rule unsealed (nothing to migrate, no work) — it
+  // seals on the first pass that actually has titles, so a not-yet-pulled account
+  // isn't prematurely marked migrated.
   if (targets.length === 0) return;
 
   inFlight = true;
   useCastBackfillStatus.setState({ running: true, remaining: targets.length });
-  const setItemsCast = useLibraryStore.getState().setItemsCast;
+  const { setItemsCast, setSeasonCasts } = useLibraryStore.getState();
 
   // Buffer results and write them in chunks so a big backfill doesn't trigger a
-  // store write (and full-library re-tally) per title. Stop early after a run of
+  // store write (and full-library re-tally) per fetch. Stop early after a run of
   // failures — almost always offline — so we don't fire (and re-fire on every
-  // Stats mount) hundreds of doomed requests; the undefined items are retried on
-  // a later run once connectivity is back.
-  const buffer: { mediaType: 'movie' | 'tv'; id: number; cast: CastCredit[] }[] = [];
+  // Stats mount) hundreds of doomed requests; missing items are retried later.
+  const movieBuf: { mediaType: 'movie'; id: number; cast: CastCredit[] }[] = [];
+  const seasonBuf: { showId: number; season: number; cast: CastCredit[] }[] = [];
   let failures = 0;
+  let errors = 0;
+  let processed = 0;
   const FAILURE_CAP = 8;
   const FLUSH_EVERY = 25;
   const flush = () => {
-    if (buffer.length > 0) setItemsCast(buffer.splice(0));
+    if (movieBuf.length > 0) setItemsCast(movieBuf.splice(0));
+    if (seasonBuf.length > 0) setSeasonCasts(seasonBuf.splice(0));
   };
 
   let next = 0;
-  const LIMIT = 6;
+  const LIMIT = 4;
   const worker = async () => {
     while (next < targets.length) {
-      // Stop only on a *run* of failures — almost always offline — so we don't
-      // fire (and re-fire on every Stats mount) hundreds of doomed requests. A
-      // handful of permanent 404s interspersed with successes won't halt the run.
+      // Stop only on a *run* of failures — almost always offline. A handful of
+      // permanent 404s interspersed with successes won't halt the run.
       if (failures >= FAILURE_CAP) return;
       const t = targets[next++];
       try {
-        const detail = t.mediaType === 'movie' ? await getMovie(t.id) : await getTv(t.id);
-        buffer.push({ mediaType: t.mediaType, id: t.id, cast: topCast(detail) ?? [] });
+        if (t.kind === 'movie') {
+          const detail = await withRetry(() => getMovie(t.id));
+          const fresh = topCast(detail) ?? [];
+          // Don't downgrade an existing good cast to `[]` when a re-scan gets an
+          // empty/partial credits response — keep the prior non-empty value.
+          const prev = useLibraryStore.getState().watchedMovies[t.id]?.cast;
+          if (fresh.length > 0 || !prev?.length) {
+            movieBuf.push({ mediaType: 'movie', id: t.id, cast: fresh });
+          }
+        } else {
+          const credits = await withRetry(() => getSeasonCredits(t.showId, t.season));
+          const fresh = topCast({ credits }) ?? [];
+          const prev = useLibraryStore.getState().trackedShows[t.showId]?.castBySeason?.[t.season];
+          if (fresh.length > 0 || !prev?.length) {
+            seasonBuf.push({ showId: t.showId, season: t.season, cast: fresh });
+          }
+        }
         failures = 0; // reset the consecutive-failure counter on success
-        if (buffer.length >= FLUSH_EVERY) flush();
+        processed += 1;
+        if (movieBuf.length + seasonBuf.length >= FLUSH_EVERY) flush();
       } catch (e) {
-        // A permanent "not found" won't succeed on retry — record empty cast so
-        // it isn't re-fetched forever. Transient errors count toward the cap.
+        // A permanent "not found" won't succeed on retry — record empty so it
+        // isn't re-fetched forever. But never wipe an existing good cast with `[]`
+        // on a re-scan (a title/id TMDB later deletes would otherwise vanish).
         if (e instanceof TmdbError && e.status === 404) {
-          buffer.push({ mediaType: t.mediaType, id: t.id, cast: [] });
+          if (t.kind === 'movie') {
+            const prev = useLibraryStore.getState().watchedMovies[t.id]?.cast;
+            if (!prev?.length) movieBuf.push({ mediaType: 'movie', id: t.id, cast: [] });
+          } else {
+            const prev = useLibraryStore.getState().trackedShows[t.showId]?.castBySeason?.[t.season];
+            if (!prev?.length) seasonBuf.push({ showId: t.showId, season: t.season, cast: [] });
+          }
           failures = 0;
+          processed += 1;
         } else {
           failures += 1;
+          errors += 1;
         }
       } finally {
         useCastBackfillStatus.setState((s) => ({ remaining: Math.max(0, s.remaining - 1) }));
@@ -104,5 +150,26 @@ export async function runCastBackfill(): Promise<void> {
     flush();
     inFlight = false;
     useCastBackfillStatus.setState({ running: false, remaining: 0 });
+    // Seal the migration only for the account it was computed for (an account
+    // switch mid-run must not seal the new account's library), once every target
+    // was *dispatched* (`next >= length` — the run wasn't aborted offline by the
+    // failure cap), at least one *resolved* (`processed > 0`), and total non-404
+    // errors stayed within a small fraction of the run. The last guard matters
+    // because the failure cap only bounds *consecutive* failures: an intermittent
+    // network that sprinkles a success every few requests could otherwise dispatch
+    // all targets, fail most, and permanently seal a mostly-unmigrated library.
+    // Offline/aborted or mostly-failed runs retry next time; a healthy run seals
+    // in one pass even with a few residual non-404 errors (those keep their prior
+    // cast and heal via another device's `pickCast` "longer wins").
+    const toleratedErrors = Math.max(1, Math.floor(targets.length * 0.05));
+    if (
+      migrating &&
+      useLibraryStore.getState().ownerId === owner &&
+      processed > 0 &&
+      next >= targets.length &&
+      errors <= toleratedErrors
+    ) {
+      useLibraryStore.getState().setCastRuleVersion(CAST_RULE_VERSION);
+    }
   }
 }

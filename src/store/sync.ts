@@ -145,6 +145,9 @@ function ensureOwner(userId: string): void {
     // previous account's `onboarded=true`). `applyRemote` re-sets onboarded to
     // true as soon as a non-empty library is pulled.
     store.setOnboarded(false);
+    // The pulled account's cast was selected under its own devices' rule version,
+    // so force a re-selection pass for this account's library on this device.
+    store.setCastRuleVersion(1);
     useSyncStatus.setState({ lastSyncedAt: null, phase: 'idle', error: null });
   }
   store.setOwner(userId);

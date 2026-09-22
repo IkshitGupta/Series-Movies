@@ -1,4 +1,5 @@
 import type {
+  TmdbCredits,
   TmdbDiscoverResponse,
   TmdbKeywordSearchResponse,
   TmdbMovieDetails,
@@ -113,6 +114,12 @@ export function discoverByKeyword(
 
 export function getSeason(tvId: number, seasonNumber: number): Promise<TmdbSeasonDetails> {
   return tmdbFetch<TmdbSeasonDetails>(`/tv/${tvId}/season/${seasonNumber}`);
+}
+
+/** Cast credited for a single season (used to attribute the actor stat to the
+ * seasons a user has actually watched). */
+export function getSeasonCredits(tvId: number, seasonNumber: number): Promise<TmdbCredits> {
+  return tmdbFetch<TmdbCredits>(`/tv/${tvId}/season/${seasonNumber}/credits`);
 }
 
 interface TmdbFindResponse {

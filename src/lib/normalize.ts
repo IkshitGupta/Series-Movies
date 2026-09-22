@@ -8,29 +8,56 @@ import type {
   TmdbTvDetails,
 } from '@/types';
 
-/** How many top-billed cast members to keep on a library item. Deep enough to
- * cover a title's leads/main supporting cast without dredging up bit parts;
- * minor one-off actors still stay low in the stat since it ranks by how many
- * watched titles each appears in. */
-export const MAX_CAST = 10;
+/** Total cast members kept per title for the actor stat / filmography. A blend of
+ * the top-billed leads plus the most-popular of the rest, so a headline star
+ * billed low in a big ensemble (e.g. Zendaya, 33rd in *The Odyssey*) still shows,
+ * while true bit parts (low billing AND low fame) are dropped. */
+export const MAX_CAST = 12;
+
+/** Of {@link MAX_CAST}, the slots guaranteed to the top-billed cast (the real
+ * leads / supporting cast, even when their current popularity is low). The rest
+ * are filled by TMDB `popularity` to surface recognizable low-billed actors. */
+const BILLING_LEADS = 8;
 
 /** Extract a 4-digit year from a TMDB `YYYY-MM-DD` date string. */
 export function yearFromDate(date?: string | null): string | null {
   return date ? date.slice(0, 4) || null : null;
 }
 
-/** Top-billed cast from a detail response, trimmed to id + name (deduped). */
+/**
+ * Cast to keep for a title, as `{id, name}`. Takes the top {@link BILLING_LEADS}
+ * by billing order, then fills up to {@link MAX_CAST} with the most-popular of the
+ * remaining cast (ties broken by billing). De-duped and emitted in billing order
+ * so the stored list is canonical (stable across devices for the merge).
+ */
 export function topCast(detail: { credits?: { cast?: TmdbCastMember[] } }): CastCredit[] | undefined {
   const cast = detail.credits?.cast;
   if (!cast || cast.length === 0) return undefined;
+  // De-dupe by id, then order by billing (TMDB usually pre-sorts; be defensive).
   const seen = new Set<number>();
-  const out: CastCredit[] = [];
+  const ordered: TmdbCastMember[] = [];
   for (const c of cast) {
     if (!c || !c.name || seen.has(c.id)) continue;
     seen.add(c.id);
-    out.push({ id: c.id, name: c.name });
-    if (out.length >= MAX_CAST) break;
+    ordered.push(c);
   }
+  if (ordered.length === 0) return undefined;
+  ordered.sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
+
+  const chosen = new Set<number>(ordered.slice(0, BILLING_LEADS).map((c) => c.id));
+  const remainingSlots = MAX_CAST - chosen.size;
+  if (remainingSlots > 0) {
+    const fill = ordered
+      .filter((c) => !chosen.has(c.id))
+      .sort(
+        (a, b) =>
+          (b.popularity ?? 0) - (a.popularity ?? 0) ||
+          (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER),
+      )
+      .slice(0, remainingSlots);
+    for (const c of fill) chosen.add(c.id);
+  }
+  const out = ordered.filter((c) => chosen.has(c.id)).map((c) => ({ id: c.id, name: c.name }));
   return out.length > 0 ? out : undefined;
 }
 
