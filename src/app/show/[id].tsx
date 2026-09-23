@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { queryKeys, useSeason, useShow } from '@/api/queries';
 import { getSeason } from '@/api/tmdb';
@@ -188,7 +188,6 @@ export default function ShowDetailScreen() {
   const router = useRouter();
   const markEpisodesWatched = useLibraryStore((s) => s.markEpisodesWatched);
   const setShowStatus = useLibraryStore((s) => s.setShowStatus);
-  const untrackShow = useLibraryStore((s) => s.untrackShow);
   const syncShowMeta = useLibraryStore((s) => s.syncShowMeta);
   const [busy, setBusy] = useState<string | null>(null);
   // Memoized so the derived MediaItem keeps a stable identity across renders,
@@ -441,35 +440,6 @@ export default function ShowDetailScreen() {
             <Text className="text-sm leading-5 text-neutral-600 dark:text-neutral-300">
               {show.overview}
             </Text>
-          </View>
-        ) : null}
-
-        {tracked ? (
-          <View className="px-4 pb-2">
-            <Pressable
-              onPress={() =>
-                Alert.alert(
-                  'Remove from library',
-                  `Remove “${show.name}” and its watched progress from your library? This syncs to your other devices.`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Remove',
-                      style: 'destructive',
-                      onPress: () => {
-                        untrackShow(showId);
-                        router.back();
-                      },
-                    },
-                  ],
-                )
-              }
-              className="flex-row items-center justify-center gap-2 rounded-xl border border-neutral-200 py-2 active:opacity-70 dark:border-neutral-800">
-              <Ionicons name="trash-outline" size={16} color="#dc2626" />
-              <Text className="text-sm font-semibold" style={{ color: '#dc2626' }}>
-                Remove from library
-              </Text>
-            </Pressable>
           </View>
         ) : null}
 

@@ -114,7 +114,6 @@ interface LibraryState {
   /** Keep a tracked show's episode totals in sync with TMDB (new season aired, or
    * newly-aired episodes changing the released count). */
   syncShowMeta: (id: number, meta: { totalEpisodes?: number; airedEpisodes?: number }) => void;
-  untrackShow: (id: number) => void;
 
   // --- Cast backfill ---
   /** Set/replace the stored top cast for an existing watched movie or tracked
@@ -624,28 +623,6 @@ export const useLibraryStore = create<LibraryState>()(
           }
           if (!changed) return state;
           return { trackedShows: { ...state.trackedShows, [id]: next } };
-        }),
-
-      untrackShow: (id) =>
-        set((state) => {
-          const show = state.trackedShows[id];
-          const next = { ...state.trackedShows };
-          delete next[id];
-          // Tombstone the show AND each episode it removed, at one timestamp, so
-          // re-tracking the show later starts fresh instead of resurrecting its
-          // old progress from a stale cloud copy. (A genuinely new episode watched
-          // concurrently on another device has no tombstone and survives.)
-          const now = Date.now();
-          let tombstones = addStamps(state.tombstones, 'shows', [id], now);
-          if (show && show.watchedEpisodes.length > 0) {
-            tombstones = addStamps(
-              tombstones,
-              'episodes',
-              show.watchedEpisodes.map((k) => episodeTombstoneKey(id, k)),
-              now,
-            );
-          }
-          return { trackedShows: next, tombstones };
         }),
 
       setItemCast: (mediaType, id, cast) =>

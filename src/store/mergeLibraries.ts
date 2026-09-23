@@ -8,6 +8,7 @@ import {
   type WatchedMovie,
   type WatchlistItem,
 } from '@/types';
+import { MAX_CAST } from '@/lib/normalize';
 
 /**
  * Pure, dependency-free library merge used by the sync engine.
@@ -118,14 +119,19 @@ function mergeRevivals(
 
 /** Merge two cast lists symmetrically. Prefer a non-empty side so an empty `[]`
  * (written when a title 404s on TMDB during backfill) can never wipe a real cast
- * another device fetched; then prefer the more complete list (TMDB can grow a
- * title's credits over time); on an equal length pick deterministically by the
- * id+name sequence. Order-independent → the chosen `cast` is the same regardless
- * of merge direction (commutative). */
+ * another device fetched. Then prefer a **current-era** cast (one that fits within
+ * `MAX_CAST`) over a **legacy** one that exceeds it: an older, larger cap stored
+ * up to 15 members, and "longer wins" alone would let that stale list revert a
+ * migration to today's fewer, better-selected members. Among casts of the same
+ * era, prefer the more complete list (TMDB can grow a title's credits over time),
+ * then an id+name tiebreak. Order-independent → commutative. */
 const castKey = (c?: CastCredit[]) => (c ?? []).map((x) => `${x.id}\u0000${x.name}`).join('\u0001');
 function pickCast(a?: CastCredit[], b?: CastCredit[]): CastCredit[] | undefined {
   if (!a || a.length === 0) return b ?? a;
   if (!b || b.length === 0) return a;
+  const aLegacy = a.length > MAX_CAST;
+  const bLegacy = b.length > MAX_CAST;
+  if (aLegacy !== bLegacy) return aLegacy ? b : a;
   if (a.length !== b.length) return a.length > b.length ? a : b;
   return castKey(a) <= castKey(b) ? a : b;
 }
@@ -373,9 +379,8 @@ export function mergeLibraries(local: LibraryPayload, remote: LibraryPayload): L
       if (winner) userStatus = winner.userStatus;
     }
     if (removedByTomb(tombstones.showStatus[id], addAt(revivals.showStatus[id]))) userStatus = undefined;
-    // Episodes: dropped by their own tombstone (a per-episode un-tick, or one of
-    // the per-episode tombstones `untrackShow` writes for every episode it
-    // removed). An episode re-watched after that removal (newer `episodeWatchedAt`)
+    // Episodes: dropped by their own tombstone (written when an episode is
+    // un-ticked). An episode re-watched after that removal (newer `episodeWatchedAt`)
     // survives; a concurrent *new* episode on another device has no tombstone.
     // An imported episode's revival marker lets it beat a stale tombstone despite
     // its historical (old) watch date.

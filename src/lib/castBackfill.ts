@@ -29,8 +29,10 @@ export const useCastBackfillStatus = create<BackfillStatus>(() => ({
 let inFlight = false;
 
 /** Selection-rule version the stored cast should be built with. Bump when the
- * cast-selection logic in `topCast` changes, to trigger a one-time re-fetch. */
-const CAST_RULE_VERSION = 2;
+ * cast-selection logic in `topCast` changes, to trigger a one-time re-fetch.
+ * v3: re-run after fixing the merge that let a longer legacy cast revert the
+ * hybrid re-selection, so devices sealed at v2 (possibly reverted) re-migrate. */
+const CAST_RULE_VERSION = 3;
 
 type Target =
   | { kind: 'movie'; id: number }
