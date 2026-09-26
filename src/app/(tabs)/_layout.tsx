@@ -158,7 +158,7 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="stats"
-        options={{ title: 'Stats', tabBarIcon: makeTabIcon('stats-chart') }}
+        options={{ title: 'Stats', tabBarIcon: makeTabIcon('stats-chart'), freezeOnBlur: true }}
       />
     </Tabs>
   );

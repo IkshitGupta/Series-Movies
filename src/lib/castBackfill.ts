@@ -87,7 +87,10 @@ export async function runCastBackfill(): Promise<void> {
   let errors = 0;
   let processed = 0;
   const FAILURE_CAP = 8;
-  const FLUSH_EVERY = 25;
+  // Scale the flush batch with the run size so a huge migration writes the store
+  // (and re-tallies/re-renders/persists the whole blob) ~8 times, not once per 25
+  // items — the per-write cost is what causes visible hitches during a migration.
+  const FLUSH_EVERY = Math.max(25, Math.ceil(targets.length / 8));
   const flush = () => {
     if (movieBuf.length > 0) setItemsCast(movieBuf.splice(0));
     if (seasonBuf.length > 0) setSeasonCasts(seasonBuf.splice(0));

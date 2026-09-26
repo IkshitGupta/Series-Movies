@@ -931,9 +931,28 @@ export function getTopCast(
       if (s.watchedEpisodes.length > 0) bump(showCastForStat(s));
     }
   }
-  return [...counts.values()]
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-    .slice(0, TOP_CAST_LIMIT);
+  // Partial top-K selection instead of a full sort: rendering only the top
+  // `TOP_CAST_LIMIT` doesn't justify sorting every actor (there can be thousands),
+  // and `localeCompare` is the priciest comparator (it crosses into platform ICU
+  // on Hermes). Bucket by count, take whole buckets from the highest count down
+  // until we have enough, then sort just that subset. The within-equal-count
+  // tiebreak is cosmetic, so a plain string compare is fine.
+  const cmp = (a: CastCount, b: CastCount) =>
+    b.count - a.count || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+  const all = [...counts.values()];
+  if (all.length <= TOP_CAST_LIMIT) return all.sort(cmp);
+  const byCount = new Map<number, CastCount[]>();
+  for (const c of all) {
+    const bucket = byCount.get(c.count);
+    if (bucket) bucket.push(c);
+    else byCount.set(c.count, [c]);
+  }
+  const subset: CastCount[] = [];
+  for (const count of [...byCount.keys()].sort((a, b) => b - a)) {
+    subset.push(...byCount.get(count)!);
+    if (subset.length >= TOP_CAST_LIMIT) break;
+  }
+  return subset.sort(cmp).slice(0, TOP_CAST_LIMIT);
 }
 
 /** Format a minutes total as "Xd Yh" / "Yh Zm" / "Zm". */
