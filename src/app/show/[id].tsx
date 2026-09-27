@@ -205,6 +205,26 @@ export default function ShowDetailScreen() {
     });
   }, [tracked, show, showId, syncShowMeta]);
 
+  // Per-episode runtime for the whole-show total estimate. TMDB's show-level
+  // `episode_run_time` is frequently empty, so fall back to the average runtime
+  // of the currently-shown season's episodes — this makes the total work for a
+  // show being *searched/previewed* (not just tracked ones, which stored it). The
+  // season is read from the shared query cache (SeasonEpisodes fetches the same
+  // key), so this adds no extra request.
+  const defaultSeasonNumber = useMemo(
+    () => show?.seasons?.find((s) => s.season_number >= 1 && s.episode_count > 0)?.season_number ?? 1,
+    [show],
+  );
+  const runtimeSeason = selectedSeason ?? defaultSeasonNumber;
+  const { data: runtimeSeasonData } = useSeason(showId, runtimeSeason, !!show);
+  const seasonAvgRuntime = useMemo(() => {
+    const runtimes = (runtimeSeasonData?.episodes ?? [])
+      .map((e) => e.runtime ?? 0)
+      .filter((r) => r > 0);
+    if (runtimes.length === 0) return 0;
+    return Math.round(runtimes.reduce((a, b) => a + b, 0) / runtimes.length);
+  }, [runtimeSeasonData]);
+
   if (isLoading) {
     return (
       <>
@@ -232,7 +252,8 @@ export default function ShowDetailScreen() {
   const total = show.number_of_episodes;
   // Best-effort whole-show runtime: per-episode runtime (from the show, or the
   // avg we stored when a season was viewed) × episode count. Shown as an estimate.
-  const perEpisodeRuntime = show.episode_run_time?.[0] || tracked?.episodeRuntime || 0;
+  const perEpisodeRuntime =
+    show.episode_run_time?.[0] || tracked?.episodeRuntime || seasonAvgRuntime || 0;
   const showRuntimeTotal = perEpisodeRuntime > 0 ? perEpisodeRuntime * total : 0;
   // Episodes released so far — the denominator for progress (excludes unaired).
   const airedTotal = airedEpisodeCount(show) ?? total;
