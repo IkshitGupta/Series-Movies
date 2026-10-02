@@ -84,6 +84,21 @@ export function formatAirDate(iso: string): string {
 }
 
 /**
+ * Badge label for an unreleased title, e.g. "Releases Dec 15, 2026" (movie) or
+ * "Premieres Aug 12, 2026" (TV). Returns null when the title has already
+ * released/aired or has no known date (so released/undated titles get no badge).
+ */
+export function unreleasedLabel(
+  mediaType: 'movie' | 'tv',
+  date: string | null | undefined,
+  todayIso?: string,
+): string | null {
+  if (hasEpisodeAired(date, todayIso)) return null;
+  const verb = mediaType === 'movie' ? 'Releases' : 'Premieres';
+  return `${verb} ${formatAirDate(date!)}`;
+}
+
+/**
  * Short label for a row/badge, e.g. "New season · Aug 12, 2026",
  * "New episode · Jul 12, 2026", or "New season coming" when undated.
  */

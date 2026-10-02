@@ -11,6 +11,12 @@ export interface MediaItem {
   title: string;
   posterPath: string | null;
   year: string | null;
+  /** TMDB release/first-air date (`YYYY-MM-DD`), when known. Movies use
+   * `release_date`, TV `first_air_date`. **Display-only** — set on list items to
+   * render the "unreleased" badge; stripped by `toStored` before an item enters
+   * the library, so it is never persisted or synced (read it from fresh TMDB
+   * data, never from a stored item). */
+  releaseDate?: string | null;
   /** Genre names. Populated from detail responses; absent for search results. */
   genres?: string[];
   /** Top billed cast (from detail credits). Populated when a title is

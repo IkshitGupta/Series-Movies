@@ -15,6 +15,7 @@ import { DetailHeaderSkeleton } from '@/components/Skeleton';
 import { Tag } from '@/components/Tag';
 import { WatchlistButton } from '@/components/WatchlistButton';
 import { movieToMediaItem } from '@/lib/normalize';
+import { hasEpisodeAired } from '@/lib/airing';
 import { getMovieCertification, normalizeRecommendations } from '@/lib/tmdbExtras';
 import { profileUrl } from '@/lib/tmdbImage';
 import { useIsMovieWatched, useLibraryStore } from '@/store/useLibraryStore';
@@ -69,6 +70,12 @@ export default function MovieDetailScreen() {
 
   const item = movieToMediaItem(movie);
   const runtime = formatRuntime(movie.runtime);
+  // A movie with a known future release date can't be marked watched yet (unless
+  // it somehow already is — e.g. a stray import — in which case stay un-blocked so
+  // it's still visible/un-markable). `hasEpisodeAired` treats an unknown date as
+  // released, so TBA/undated titles remain markable.
+  const released = hasEpisodeAired(movie.release_date);
+  const blocked = !released && !watched;
   const cast = movie.credits?.cast?.slice(0, 12) ?? [];
   const cert = getMovieCertification(movie);
   const recs = normalizeRecommendations(movie.recommendations?.results, 'movie').slice(0, 12);
@@ -127,16 +134,23 @@ export default function MovieDetailScreen() {
 
         <View className="flex-row items-center gap-3 px-4">
           <Pressable
-            onPress={() => (watched ? unmark(movieId) : markWatched(item))}
+            onPress={() => (watched ? unmark(movieId) : blocked ? undefined : markWatched(item))}
+            disabled={blocked}
             className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl py-3 active:opacity-80"
-            style={{ backgroundColor: watched ? COLORS.success : COLORS.brand }}>
+            style={{
+              backgroundColor: blocked
+                ? COLORS.mutedDark
+                : watched
+                  ? COLORS.success
+                  : COLORS.brand,
+            }}>
             <Ionicons
-              name={watched ? 'checkmark-circle' : 'add-circle-outline'}
+              name={blocked ? 'time-outline' : watched ? 'checkmark-circle' : 'add-circle-outline'}
               size={20}
               color="white"
             />
             <Text className="text-base font-semibold text-white">
-              {watched ? 'Watched' : 'Mark watched'}
+              {blocked ? 'Not released yet' : watched ? 'Watched' : 'Mark watched'}
             </Text>
           </Pressable>
           {!watched ? (

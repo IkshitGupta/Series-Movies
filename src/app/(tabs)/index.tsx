@@ -5,6 +5,7 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { useKeywordMatch, useSearch, useTrending } from '@/api/queries';
 import { hasApiKey } from '@/api/tmdb';
+import { unreleasedLabel } from '@/lib/airing';
 import { EmptyState } from '@/components/EmptyState';
 import { MediaCard } from '@/components/MediaCard';
 import { SearchBar } from '@/components/SearchBar';
@@ -80,6 +81,7 @@ export default function SearchScreen() {
               <MediaCard
                 item={item}
                 onPress={() => openItem(item)}
+                badge={unreleasedLabel(item.mediaType, item.releaseDate) ?? undefined}
                 right={<WatchlistButton item={item} showCategorizedState />}
               />
             )}
@@ -130,6 +132,7 @@ export default function SearchScreen() {
           <MediaCard
             item={item}
             onPress={() => openItem(item)}
+            badge={unreleasedLabel(item.mediaType, item.releaseDate) ?? undefined}
             right={<WatchlistButton item={item} showCategorizedState />}
           />
         )}

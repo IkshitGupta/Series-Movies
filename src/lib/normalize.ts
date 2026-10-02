@@ -70,6 +70,7 @@ export function normalizeSearchItem(item: TmdbSearchItem): MediaItem | null {
     title: item.title ?? item.name ?? 'Untitled',
     posterPath: item.poster_path,
     year: yearFromDate(item.release_date ?? item.first_air_date),
+    releaseDate: item.release_date || item.first_air_date || null,
   };
 }
 
@@ -108,5 +109,6 @@ export function discoverItemToMediaItem(
     title: item.title ?? item.name ?? 'Untitled',
     posterPath: item.poster_path,
     year: yearFromDate(item.release_date ?? item.first_air_date),
+    releaseDate: item.release_date || item.first_air_date || null,
   };
 }

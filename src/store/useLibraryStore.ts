@@ -137,6 +137,20 @@ function isSame(item: WatchlistItem, mediaType: MediaItem['mediaType'], id: numb
   return item.mediaType === mediaType && item.id === id;
 }
 
+/**
+ * Strip display-only fields before an item is persisted/synced. `releaseDate`
+ * rides on list items purely to render the "unreleased" badge (computed from
+ * fresh TMDB data) — it must never enter the library: the CRDT merge doesn't
+ * track it, so a stale/divergent snapshot could ping-pong across devices (and an
+ * older app version's merge could clobber a real date with `null`).
+ */
+function toStored(item: MediaItem): MediaItem {
+  if (item.releaseDate === undefined) return item;
+  const rest = { ...item };
+  delete rest.releaseDate;
+  return rest;
+}
+
 function ensureTracked(
   shows: Record<number, TrackedShow>,
   item: MediaItem,
@@ -154,7 +168,7 @@ function ensureTracked(
     };
   }
   return {
-    ...item,
+    ...toStored(item),
     mediaType: 'tv',
     watchedEpisodes: [],
     totalEpisodes,
@@ -326,7 +340,7 @@ export const useLibraryStore = create<LibraryState>()(
         set((state) => {
           if (state.watchlist.some((w) => isSame(w, item.mediaType, item.id))) return state;
           return {
-            watchlist: [{ ...item, addedAt: Date.now() }, ...state.watchlist],
+            watchlist: [{ ...toStored(item), addedAt: Date.now() }, ...state.watchlist],
           };
         }),
 
@@ -343,7 +357,7 @@ export const useLibraryStore = create<LibraryState>()(
           return {
             watchedMovies: {
               ...state.watchedMovies,
-              [item.id]: { ...item, mediaType: 'movie', watchedAt: now },
+              [item.id]: { ...toStored(item), mediaType: 'movie', watchedAt: now },
             },
             watchlist: wasListed
               ? state.watchlist.filter((w) => !isSame(w, 'movie', item.id))

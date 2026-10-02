@@ -3,7 +3,7 @@
     "name": "Seen It",
     "slug": "MoviesSeriesHub",
     "owner": "sting1712s-team",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "moviesserieshub",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.moviesserieshub.app",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "backgroundColor": "#010102",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
