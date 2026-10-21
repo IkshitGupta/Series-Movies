@@ -3,18 +3,26 @@
     "name": "Seen It",
     "slug": "MoviesSeriesHub",
     "owner": "sting1712s-team",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "moviesserieshub",
     "userInterfaceStyle": "automatic",
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/b9f72627-0b03-4eea-8a9c-023f7e65c20d",
+      "enabled": true,
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
+    },
     "ios": {
       "bundleIdentifier": "com.moviesserieshub.app",
       "supportsTablet": true
     },
     "android": {
       "package": "com.moviesserieshub.app",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "backgroundColor": "#010102",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -50,7 +58,8 @@
       "router": {},
       "eas": {
         "projectId": "b9f72627-0b03-4eea-8a9c-023f7e65c20d"
-      }
+      },
+      "updateManifestUrl": "https://raw.githubusercontent.com/IkshitGupta/Series-Movies/main/update-manifest.json"
     }
   }
 }

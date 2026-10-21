@@ -23,6 +23,7 @@ import {
   searchMovieByTitle,
   TmdbError,
 } from '@/api/tmdb';
+import { statusEpisodeTotal } from '@/lib/airing';
 import { topCast } from '@/lib/normalize';
 import {
   episodeKey,
@@ -502,7 +503,7 @@ export async function resolveLibrary(
             watchedEpisodes,
             episodeWatchedAt:
               Object.keys(s.episodeWatchedAt).length > 0 ? { ...s.episodeWatchedAt } : undefined,
-            totalEpisodes: d.number_of_episodes,
+            totalEpisodes: statusEpisodeTotal(d),
             episodeRuntime,
             userStatus: s.userStatus,
             lastUpdated: Date.now(),
@@ -518,7 +519,7 @@ export async function resolveLibrary(
           shows[tmdbId] = {
             ...base,
             watchedEpisodes: [],
-            totalEpisodes: d.number_of_episodes,
+            totalEpisodes: statusEpisodeTotal(d),
             userStatus: s.userStatus,
             lastUpdated: Date.now(),
           };

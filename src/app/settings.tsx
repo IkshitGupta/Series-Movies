@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 import { useRouter } from 'expo-router';
 import { type ComponentProps, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { saveOrShare } from '@/lib/download';
 import { buildExportZip, isLibraryEmpty } from '@/lib/libraryBackup';
+import { checkForUpdate, type UpdateCheckResult } from '@/lib/updateCheck';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { syncNow, useSyncStatus } from '@/store/sync';
 import { displayName, useAuth, validateUsername } from '@/store/useAuth';
@@ -16,11 +18,12 @@ import { COLORS } from '@/theme/colors';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
-// Installed app version, read from the embedded config so the user can confirm an
-// update actually applied after installing a new APK.
-const APP_VERSION = Constants.expoConfig?.version ?? '—';
-const BUILD_NUMBER =
-  Constants.expoConfig?.android?.versionCode ?? Constants.expoConfig?.ios?.buildNumber ?? '—';
+// Installed app version, read from the native binary (expo-application) so it stays
+// correct even after an OTA update swaps the JS bundle's embedded config. The build
+// number is native-only (null on web, where it's omitted).
+const APP_VERSION =
+  Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? '—';
+const BUILD_NUMBER = Application.nativeBuildVersion;
 
 const THEME_OPTIONS: { key: ThemePref; label: string; icon: IoniconName }[] = [
   { key: 'system', label: 'System', icon: 'phone-portrait-outline' },
@@ -84,6 +87,8 @@ export default function SettingsScreen() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
   const { session } = useAuth();
   const syncStatus = useSyncStatus();
   const theme = useLibraryStore((s) => s.theme);
@@ -186,6 +191,36 @@ export default function SettingsScreen() {
       setExporting(false);
     }
   };
+
+  // When an update is already known to be available, a tap opens the APK; otherwise
+  // it (re)runs the check. Only a newer `versionCode` in the manifest counts.
+  const onCheckUpdate = async () => {
+    if (updateResult?.status === 'available') {
+      Linking.openURL(updateResult.apkUrl).catch(() =>
+        Alert.alert('Could not open download', 'Please try again.'),
+      );
+      return;
+    }
+    if (checkingUpdate) return;
+    setCheckingUpdate(true);
+    setUpdateResult(await checkForUpdate());
+    setCheckingUpdate(false);
+  };
+
+  const updateSubtitle = (() => {
+    switch (updateResult?.status) {
+      case 'available':
+        return `Update available: v${updateResult.versionName} — tap to download`;
+      case 'latest':
+        return `You're on the latest version (v${APP_VERSION})`;
+      case 'not-configured':
+        return 'Update checks are not set up yet';
+      case 'error':
+        return "Couldn't check — tap to retry";
+      default:
+        return 'Tap to see if a newer version is available';
+    }
+  })();
 
   return (
     <ScrollView
@@ -307,9 +342,25 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      {Platform.OS !== 'web' ? (
+        <View className="gap-2">
+          <Text className="px-1 text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">
+            About
+          </Text>
+          <SettingsRow
+            icon={updateResult?.status === 'available' ? 'arrow-down-circle-outline' : 'refresh-outline'}
+            title="Check for updates"
+            subtitle={updateSubtitle}
+            onPress={onCheckUpdate}
+            busy={checkingUpdate}
+          />
+        </View>
+      ) : null}
+
       <View className="items-center pt-2">
         <Text className="text-xs text-neutral-400 dark:text-neutral-500">
-          Seen It · v{APP_VERSION} (build {BUILD_NUMBER})
+          Seen It · v{APP_VERSION}
+          {BUILD_NUMBER ? ` (build ${BUILD_NUMBER})` : ''}
         </Text>
       </View>
 

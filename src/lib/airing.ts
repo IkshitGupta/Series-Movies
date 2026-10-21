@@ -126,3 +126,46 @@ export function airedEpisodeCount(
   }
   return count > 0 ? count : null;
 }
+
+/**
+ * The episode total a show's Watching/Completed status is measured against:
+ * TMDB's `number_of_episodes` minus the episodes of any listed season that hasn't
+ * started airing yet. So a caught-up show stays "Watching" while its current
+ * season is still airing (its announced episodes count), but a finished show only
+ * moves back to Watching once its next season actually premieres — not months
+ * earlier, when TMDB first lists it.
+ *
+ * Deliberately subtractive: `number_of_episodes` often differs slightly from the
+ * sum of the season counts, so this returns it unchanged whenever no unstarted
+ * season is listed. Never below the episodes aired so far.
+ */
+export function statusEpisodeTotal(
+  tv?: Pick<TmdbTvDetails, 'number_of_episodes' | 'seasons' | 'last_episode_to_air'> | null,
+  todayIso?: string,
+): number {
+  const total = tv?.number_of_episodes ?? 0;
+  const last = tv?.last_episode_to_air;
+  // Nothing has aired yet: no season boundary.
+  if (!tv || !last) return total;
+  // The latest season that has started airing: normally the latest aired
+  // episode's. When that was a special (season 0, e.g. a holiday special after
+  // the finale), use the latest regular season that has premiered instead.
+  let current = last.season_number;
+  if (current < 1) {
+    const today = todayIso ?? localTodayIso();
+    for (const s of tv.seasons ?? []) {
+      if (s.season_number > current && s.air_date && s.air_date <= today) {
+        current = s.season_number;
+      }
+    }
+    if (current < 1) return total;
+  }
+  let unstarted = 0;
+  for (const s of tv.seasons ?? []) {
+    if (s.season_number > current) unstarted += s.episode_count ?? 0;
+  }
+  if (unstarted === 0) return total;
+  const aired = Math.min(airedEpisodeCount(tv) ?? 0, total);
+  const started = Math.max(total - unstarted, aired);
+  return started > 0 ? started : total;
+}

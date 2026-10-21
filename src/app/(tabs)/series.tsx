@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, AppState, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useShow } from '@/api/queries';
 import { EmptyState } from '@/components/EmptyState';
@@ -10,8 +10,9 @@ import { MediaCard } from '@/components/MediaCard';
 import { SelectChip } from '@/components/SelectChip';
 import { SortBar } from '@/components/SortBar';
 import { StatusBadge } from '@/components/StatusBadge';
-import { airedEpisodeCount, getUpcoming, upcomingLabel } from '@/lib/airing';
+import { airedEpisodeCount, getUpcoming, localTodayIso, statusEpisodeTotal, upcomingLabel } from '@/lib/airing';
 import { findNextEpisode, nextUnwatchedEpisode } from '@/lib/nextEpisode';
+import { noteNextAirDate, refreshShowTotals, useShowSchedule } from '@/lib/showRefresh';
 import { DEFAULT_SORT, sortLibraryItems, type SortState } from '@/lib/sort';
 import { getShowProgress, getShowStatus, useLibraryStore } from '@/store/useLibraryStore';
 import { episodeKey, type MediaItem, type ShowStatus, type ShowUserStatus, type TrackedShow } from '@/types';
@@ -95,21 +96,33 @@ function SeriesRow({
   busy,
   onOpen,
   onMarkNext,
+  hideStatus = false,
 }: {
   item: TrackedShow;
   tvFilter: TvFilter;
   busy: boolean;
   onOpen: (item: MediaItem) => void;
   onMarkNext: (show: TrackedShow) => void;
+  /** Omit the status pill (e.g. in Completed → Upcoming, where every row is
+   * completed) so the air-date badge gets the full width on narrow phones. */
+  hideStatus?: boolean;
 }) {
   const { data } = useShow(item.id);
   const syncShowMeta = useLibraryStore((s) => s.syncShowMeta);
-  // Sync the released-episode count from the fetched detail so the list shows
-  // aired-based progress (e.g. 20/21, not 20/26) without opening each show.
-  // Only airedEpisodes is synced here (display) — grouping stays put.
+  // Sync the totals from the fetched detail so the list reflects TMDB without
+  // opening each show: aired-based progress (e.g. 20/21, not 20/26), and the
+  // status total that moves a finished show back to Watching once its new season
+  // premieres. Shows not on screen are kept current by `refreshShowTotals`.
+  // Runs on new TMDB data only: a total that sync merged in from another device
+  // may be newer than this cached copy, so `refreshShowTotals` settles it from the
+  // network instead of the row writing the cache back over it.
   useEffect(() => {
     if (!data) return;
-    syncShowMeta(item.id, { airedEpisodes: airedEpisodeCount(data) ?? undefined });
+    syncShowMeta(item.id, {
+      totalEpisodes: statusEpisodeTotal(data),
+      airedEpisodes: airedEpisodeCount(data) ?? undefined,
+    });
+    noteNextAirDate(item.id, data);
   }, [data, item.id, syncShowMeta]);
   const { watched, total } = getShowProgress(item);
   const status = getShowStatus(item);
@@ -136,8 +149,9 @@ function SeriesRow({
   }
   // Once every aired episode is watched there's nothing to mark next, so show the
   // status badge instead of a Next button that would otherwise target an unaired
-  // episode.
-  const showNext = canMarkNext && nextUp?.kind !== 'caught-up';
+  // episode. A completed show can still sit in "Continue later" (flagged while
+  // waiting for an announced season) — nothing to mark next there either.
+  const showNext = canMarkNext && status !== 'completed' && nextUp?.kind !== 'caught-up';
   return (
     <MediaCard
       item={item}
@@ -147,7 +161,7 @@ function SeriesRow({
       right={
         showNext ? (
           <MarkNextButton busy={busy} onPress={() => onMarkNext(item)} />
-        ) : (
+        ) : hideStatus ? undefined : (
           <StatusBadge label={label} tone={tone} />
         )
       }
@@ -163,6 +177,24 @@ export default function SeriesScreen() {
   const setShowEpisodeRuntime = useLibraryStore((s) => s.setShowEpisodeRuntime);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
+
+  // Keep every tracked show's totals current in the background (throttled per
+  // show), so new seasons regroup shows even if they're not on screen — on each
+  // visit, and when the app returns to the foreground while this tab is open.
+  useFocusEffect(
+    useCallback(() => {
+      void refreshShowTotals(queryClient);
+      const sub = AppState.addEventListener('change', (next) => {
+        if (next === 'active') void refreshShowTotals(queryClient);
+      });
+      return () => sub.remove();
+    }, [queryClient]),
+  );
+  // And on every library change (e.g. a sync merged in another device's older
+  // totals): only shows whose stored total diverged are re-derived — cheap otherwise.
+  useEffect(() => {
+    void refreshShowTotals(queryClient);
+  }, [trackedShows, queryClient]);
 
   const shows = useMemo(
     () => sortLibraryItems(Object.values(trackedShows), sort, (s) => s.lastUpdated),
@@ -180,6 +212,26 @@ export default function SeriesScreen() {
     for (const show of shows) groups[showGroup(show)].push(show);
     return groups;
   }, [shows]);
+
+  // Completed → "Upcoming": finished shows with a confirmed future air date (a new
+  // season or episode), soonest first. Dates come from each show's last TMDB check.
+  const nextAirDates = useShowSchedule((s) => s.next);
+  const checkingSchedule = useShowSchedule((s) => s.checking);
+  const [upcomingOnly, setUpcomingOnly] = useState(false);
+  const today = localTodayIso();
+  const upcomingCompleted = useMemo(
+    () =>
+      tvGroups.completed
+        .filter((s) => (nextAirDates[s.id] ?? '') >= today)
+        .sort(
+          (a, b) =>
+            (nextAirDates[a.id] ?? '').localeCompare(nextAirDates[b.id] ?? '') ||
+            a.title.localeCompare(b.title),
+        ),
+    [tvGroups, nextAirDates, today],
+  );
+  const showUpcoming = tvFilter === 'completed' && upcomingOnly;
+  const listData = showUpcoming ? upcomingCompleted : tvGroups[tvFilter];
 
   const openItem = (item: MediaItem) => {
     router.push({ pathname: '/show/[id]', params: { id: String(item.id) } });
@@ -239,19 +291,43 @@ export default function SeriesScreen() {
         })}
       </ScrollView>
 
-      <View className="px-4 pb-2">
-        <SortBar sort={sort} onChange={setSort} />
+      <View className="flex-row flex-wrap items-center justify-between gap-2 px-4 pb-2">
+        {showUpcoming ? (
+          <View className="flex-row items-center gap-1.5">
+            <Ionicons name="calendar-outline" size={14} color={COLORS.muted} />
+            <Text className="text-xs text-neutral-500 dark:text-neutral-400">
+              {checkingSchedule ? 'Soonest first · checking for new dates…' : 'Soonest first'}
+            </Text>
+          </View>
+        ) : (
+          <SortBar sort={sort} onChange={setSort} />
+        )}
+        {tvFilter === 'completed' ? (
+          <SelectChip
+            label={`Upcoming (${upcomingCompleted.length})`}
+            active={upcomingOnly}
+            onPress={() => setUpcomingOnly((v) => !v)}
+          />
+        ) : null}
       </View>
 
-      {tvGroups[tvFilter].length === 0 ? (
-        <EmptyState
-          icon="tv-outline"
-          title={TV_EMPTY[tvFilter].title}
-          message={TV_EMPTY[tvFilter].message}
-        />
+      {listData.length === 0 ? (
+        showUpcoming ? (
+          <EmptyState
+            icon="calendar-outline"
+            title={checkingSchedule ? 'Checking for new dates…' : 'Nothing scheduled'}
+            message="Completed shows with a confirmed date for a new season or episode appear here."
+          />
+        ) : (
+          <EmptyState
+            icon="tv-outline"
+            title={TV_EMPTY[tvFilter].title}
+            message={TV_EMPTY[tvFilter].message}
+          />
+        )
       ) : (
         <FlatList
-          data={tvGroups[tvFilter]}
+          data={listData}
           keyExtractor={(item) => `tv-${item.id}`}
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 8, paddingBottom: 32 }}
@@ -262,6 +338,7 @@ export default function SeriesScreen() {
               busy={busyId === item.id}
               onOpen={openItem}
               onMarkNext={markNext}
+              hideStatus={showUpcoming}
             />
           )}
         />

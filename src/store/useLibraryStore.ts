@@ -23,6 +23,9 @@ import {
   type WatchlistItem,
 } from '@/types';
 
+/** TMDB-derived episode totals for a tracked show (see `syncShowMeta`). */
+type ShowMetaUpdate = { totalEpisodes?: number; airedEpisodes?: number };
+
 interface LibraryState {
   /** Single "To Watch" list (movies + shows mixed), newest first. */
   watchlist: WatchlistItem[];
@@ -113,7 +116,10 @@ interface LibraryState {
   setShowEpisodeRuntime: (id: number, runtime: number) => void;
   /** Keep a tracked show's episode totals in sync with TMDB (new season aired, or
    * newly-aired episodes changing the released count). */
-  syncShowMeta: (id: number, meta: { totalEpisodes?: number; airedEpisodes?: number }) => void;
+  syncShowMeta: (id: number, meta: ShowMetaUpdate) => void;
+  /** Bulk {@link syncShowMeta}: applies every change in one store write, and none
+   * at all when nothing changed (each persisted write re-serializes the library). */
+  syncShowsMeta: (updates: ({ id: number } & ShowMetaUpdate)[]) => void;
 
   // --- Cast backfill ---
   /** Set/replace the stored top cast for an existing watched movie or tracked
@@ -233,7 +239,7 @@ function pruneRevivals(r: Revivals | undefined, cutoff: number): Revivals {
 
 export const useLibraryStore = create<LibraryState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       watchlist: [],
       watchedMovies: {},
       trackedShows: {},
@@ -609,35 +615,34 @@ export const useLibraryStore = create<LibraryState>()(
           };
         }),
 
-      syncShowMeta: (id, meta) =>
-        set((state) => {
-          const show = state.trackedShows[id];
-          if (!show) return state;
-          const next = { ...show };
-          let changed = false;
-          // totalEpisodes (incl. announced) drives status/grouping; a new season
-          // aired/announced flips a completed show back to watching.
-          if (
-            meta.totalEpisodes &&
-            meta.totalEpisodes > 0 &&
-            show.totalEpisodes !== meta.totalEpisodes
-          ) {
-            next.totalEpisodes = meta.totalEpisodes;
-            changed = true;
+      syncShowMeta: (id, meta) => get().syncShowsMeta([{ id, ...meta }]),
+
+      syncShowsMeta: (updates) => {
+        // Compared against the current state first, so a no-op never reaches `set`
+        // (persist re-serializes the whole library on every `set`, even a no-op).
+        const current = get().trackedShows;
+        let shows: Record<number, TrackedShow> | null = null;
+        for (const { id, totalEpisodes, airedEpisodes } of updates) {
+          const show = (shows ?? current)[id];
+          if (!show) continue;
+          let next: TrackedShow | null = null;
+          // totalEpisodes (episodes of seasons that have started airing — see
+          // `statusEpisodeTotal`) drives status/grouping: a new season premiering
+          // flips a completed show back to watching.
+          if (totalEpisodes && totalEpisodes > 0 && show.totalEpisodes !== totalEpisodes) {
+            next = { ...show, totalEpisodes };
           }
           // airedEpisodes (released so far) drives the progress denominator so
           // unaired future episodes aren't counted as "remaining".
-          if (
-            meta.airedEpisodes &&
-            meta.airedEpisodes > 0 &&
-            show.airedEpisodes !== meta.airedEpisodes
-          ) {
-            next.airedEpisodes = meta.airedEpisodes;
-            changed = true;
+          if (airedEpisodes && airedEpisodes > 0 && show.airedEpisodes !== airedEpisodes) {
+            next = { ...(next ?? show), airedEpisodes };
           }
-          if (!changed) return state;
-          return { trackedShows: { ...state.trackedShows, [id]: next } };
-        }),
+          if (!next) continue;
+          shows ??= { ...current };
+          shows[id] = next;
+        }
+        if (shows) set({ trackedShows: shows });
+      },
 
       setItemCast: (mediaType, id, cast) =>
         set((state) => {

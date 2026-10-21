@@ -15,7 +15,7 @@ import { DetailHeaderSkeleton } from '@/components/Skeleton';
 import { Tag } from '@/components/Tag';
 import { WatchlistButton } from '@/components/WatchlistButton';
 import { movieToMediaItem } from '@/lib/normalize';
-import { hasEpisodeAired } from '@/lib/airing';
+import { hasEpisodeAired, unreleasedLabel } from '@/lib/airing';
 import { getMovieCertification, normalizeRecommendations } from '@/lib/tmdbExtras';
 import { profileUrl } from '@/lib/tmdbImage';
 import { useIsMovieWatched, useLibraryStore } from '@/store/useLibraryStore';
@@ -76,6 +76,8 @@ export default function MovieDetailScreen() {
   // released, so TBA/undated titles remain markable.
   const released = hasEpisodeAired(movie.release_date);
   const blocked = !released && !watched;
+  // e.g. "Releases Dec 18, 2026" — only for a known future release date.
+  const releaseLabel = unreleasedLabel('movie', movie.release_date);
   const cast = movie.credits?.cast?.slice(0, 12) ?? [];
   const cert = getMovieCertification(movie);
   const recs = normalizeRecommendations(movie.recommendations?.results, 'movie').slice(0, 12);
@@ -131,6 +133,13 @@ export default function MovieDetailScreen() {
             </View>
           </View>
         </View>
+
+        {releaseLabel ? (
+          <View className="mx-4 mb-3 flex-row items-center gap-2 rounded-xl bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
+            <Ionicons name="calendar-outline" size={16} color={COLORS.brand} />
+            <Text className="text-sm font-semibold text-brand">{releaseLabel}</Text>
+          </View>
+        ) : null}
 
         <View className="flex-row items-center gap-3 px-4">
           <Pressable

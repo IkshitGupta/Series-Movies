@@ -19,6 +19,12 @@ const CACHE_KEY = 'tmdb-query-cache';
 const CACHE_VERSION = 1;
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 const WRITE_DEBOUNCE_MS = 1000;
+/** Queries kept only briefly — e.g. show details a background refresh fetched
+ * without any screen showing them — are never persisted. Dehydration drops
+ * `gcTime`, so a restored copy would come back with the default 24h lifetime and
+ * linger across launches. (A query a screen has observed carries the longer
+ * default, since TanStack keeps the max `gcTime` across observers.) */
+const MIN_PERSIST_GC_MS = 1000 * 60 * 5;
 
 interface CacheEnvelope {
   v: number;
@@ -67,7 +73,9 @@ function write(): void {
   try {
     const state = dehydrate(client, {
       shouldDehydrateQuery: (query) =>
-        query.state.status === 'success' && isPersistableKey(query.queryKey),
+        query.state.status === 'success' &&
+        query.gcTime >= MIN_PERSIST_GC_MS &&
+        isPersistableKey(query.queryKey),
     });
     const env: CacheEnvelope = { v: CACHE_VERSION, savedAt: Date.now(), state };
     storage.set(CACHE_KEY, JSON.stringify(env));

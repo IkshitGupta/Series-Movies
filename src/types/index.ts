@@ -53,6 +53,10 @@ export interface TrackedShow extends MediaItem {
    * may be absent for episodes marked before this was tracked. Internal data for
    * future history/recap features — not surfaced in the UI yet. */
   episodeWatchedAt?: Record<string, number>;
+  /** Episodes in the seasons that have started airing (incl. listed-but-unaired
+   * episodes of the current season) — TMDB `number_of_episodes` minus any season
+   * that hasn't premiered (see `statusEpisodeTotal`). Status is measured against
+   * it, so a finished show returns to Watching only once a new season premieres. */
   totalEpisodes: number;
   lastUpdated: number;
   /** Episodes released so far (from TMDB), used for progress so unaired future

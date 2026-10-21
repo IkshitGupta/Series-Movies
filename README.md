@@ -4,7 +4,7 @@
 
 # 🎬 Seen It
 
-A local-first mobile app to **track the movies & TV shows you've watched** and maintain a **"To Watch"** list. Search titles from [TMDB](https://www.themoviedb.org), mark movies as watched, and track TV shows **episode by episode** with a live progress bar — all stored on-device, no account required.
+A local-first mobile app to **track the movies & TV shows you've watched** and maintain a **"To Watch"** list. Search titles from [TMDB](https://www.themoviedb.org), mark movies as watched, and track TV shows **episode by episode** with a live progress bar. Your library is stored on-device (local-first) and **syncs across your devices** through a free account.
 
 Built as a modern, cross-platform (iOS + Android) React Native app.
 
@@ -15,18 +15,19 @@ Built as a modern, cross-platform (iOS + Android) React Native app.
 - 🔎 **Search** movies & TV shows via TMDB (posters, ratings, cast, genres). When the search box is empty, it shows **Trending this week**. Titles already in your library show a muted **✓ "in library"** marker. If your query matches a theme (TMDB keyword), an **"Explore the '…' theme"** chip opens a discovery list of similarly-tagged titles — without polluting the title results.
 - 🎬 **Rich detail screens** — a subtle **backdrop hero** behind the header, plus tagline, age rating (PG-13 / TV-MA), studio (movies), network (shows), and a **"More like this"** recommendations carousel. Lists and detail screens use **skeleton loaders** while fetching.
 - ✅ **Mark movies watched** with a single tap.
-- 📺 **Per-episode TV tracking** — tick individual episodes, "mark all" a season, mark the **whole series** watched, or tap **↑ to mark everything up to an episode** (including previous seasons). Live progress bar. In the **Watching** and **Continue later** lists, a **Next** button marks the next unwatched episode in one tap (and resumes a paused show).
+- 📺 **Per-episode TV tracking** — tick individual episodes, "mark all" a season, mark the **whole series** watched, or tap **↑ to mark everything up to an episode** (including previous seasons). Live progress bar. In the **Watching** and **Continue later** lists, a **Next** button marks the next unwatched episode in one tap (and resumes a paused show). Each episode shows its **runtime**, and the show screen totals **per-season** and **whole-series** watch time — visible even for titles you haven't added yet.
 - 🔖 **"To Watch" watchlist** split into **Movies** and **TV Series** tabs. Items already watched or categorized no longer offer a "to watch" option.
-- 🏷️ **TV show status** — *Watching* and *Completed* are auto-derived from episode progress; for a show you're still watching you can manually mark it **Stopped watching** or **Continue later** (these options are hidden once a show is completed). Manual flags don't affect stats and auto-clear the moment you watch another episode. If a **new season airs**, opening a completed show re-syncs its episode count from TMDB and it automatically returns to *Watching*.
-- 🗂️ **Separate Movies and Series tabs** — watched movies in one tab; series split into **4 views** with counts: *Watching · Completed · Stopped watching · Continue later*.
+- 🏷️ **TV show status** — *Watching* and *Completed* are auto-derived from episode progress; for a show you're still watching you can manually mark it **Stopped watching** or **Continue later** (these options are hidden once a show is completed). Manual flags don't affect stats and auto-clear the moment you watch another episode. When a completed show's **new season premieres**, it moves back to *Watching* on its own — the Series tab refreshes episode counts from TMDB in the background, so there's no need to open the show — while a show you're caught up on stays in *Watching* as long as its current season is still airing.
+- 🗂️ **Separate Movies and Series tabs** — watched movies in one tab; series split into **4 views** with counts: *Watching · Completed · Stopped watching · Continue later*. *Completed* has an **Upcoming** filter: finished shows with a confirmed date for a new season or episode, soonest first.
 - ↕️ **Sort your lists** — the **Movies**, **Series**, and **Watchlist** tabs each have a compact sort bar: **Recent** (default), **Title (A–Z)**, or **Release year**. Tap the active chip to flip the direction (↑/↓). Resets to Recent each launch.
-- 🗓️ **Upcoming seasons/episodes** — shows still airing display a badge in the Series list and a banner on the show screen (from TMDB): **"New season · &lt;date&gt;"** / **"New episode · &lt;date&gt;"** when a date is known, or **"New season coming"** when the show is renewed/ongoing but nothing is scheduled yet. Airing shows also refresh more often than finished ones. Progress counts only **episodes released so far**, so announced-but-unaired episodes aren't shown as "remaining" (e.g. 20/21, not 20/26).
-- 📊 **Stats** — totals, **total watch time**, and a per-genre breakdown, tracked separately for movies and TV shows. The genre list shows your **top 6** genres with a **Show all / Show less** toggle. Tap any genre to see the titles in it.
+- 🗓️ **Upcoming seasons/episodes** — shows still airing display a badge in the Series list and a banner on the show screen (from TMDB): **"New season · &lt;date&gt;"** / **"New episode · &lt;date&gt;"** when a date is known, or **"New season coming"** when the show is renewed/ongoing but nothing is scheduled yet. Airing shows also refresh more often than finished ones. Progress counts only **episodes released so far**, so announced-but-unaired episodes aren't shown as "remaining" (e.g. 20/21, not 20/26). Unreleased titles show their date too: a **"Releases &lt;date&gt;"** / **"Premieres &lt;date&gt;"** badge in Search, and a release-date banner on a movie's page (it can be marked watched from that day).
+- 📊 **Stats** — totals, **total watch time**, a per-genre breakdown, and a **Top actors & actresses** list built from the cast of everything you've watched — tracked separately for movies and TV shows. The genre list shows your **top 6** genres with a **Show all / Show less** toggle. Tap any genre to see the titles in it.
 - 🎭 **Genres** shown on both movie and TV detail screens.
 - 📥 **Import your library** — from **Settings → Import data** (or first-launch onboarding) you can bring in a **data export** (a `.zip` of JSON files). It imports your watched **movies and TV episodes**, maps each title to TMDB, mirrors your per-show status (*stopped* → Stopped watching, *watch later* → Continue later), adds not-yet-started titles to your **watchlist**, and lists anything it couldn't match with a downloadable **CSV report**.
 - 📤 **Export / backup** — **Settings → Export data** saves your whole library to a `.zip` in the **same format the importer reads**, so you can back it up or move devices and re-import it (round-trip). Exported items carry their TMDB id, so re-importing resolves instantly and losslessly.
 - 🌓 **Dark mode** — **Settings → Appearance** lets you pick **System / Light / Dark**; the choice is saved and applies across the whole app (screens, headers, tabs, status bar).
-- 💾 **Offline-first** — your data lives on the device via MMKV. No sign-in.
+- 🔐 **Accounts & cross-device sync** — sign in with email + password (plus a username) and your watched movies, episodes, watchlist, and show status **sync across devices**. The merge is conflict-free (last-writer-wins), so edits made offline on different devices reconcile cleanly. Backed by **Supabase** with Row-Level Security, so your library stays private to you.
+- 💾 **Local-first** — your library lives on-device via MMKV and works **fully offline**; changes sync to your account whenever you're online.
 
 ---
 
@@ -48,6 +49,7 @@ Built as a modern, cross-platform (iOS + Android) React Native app.
 | Data fetching | [TanStack Query](https://tanstack.com/query) (caching, loading/error states) |
 | App state | [Zustand](https://github.com/pmndrs/zustand) |
 | Persistence | [react-native-mmkv](https://github.com/mrousavy/react-native-mmkv) via a Zustand `persist` adapter |
+| Accounts & sync | [Supabase](https://supabase.com) (Auth + Postgres + Row-Level Security); last-writer-wins merge |
 | Styling | [NativeWind](https://www.nativewind.dev) (Tailwind CSS for RN) |
 | Data source | [TMDB API](https://developer.themoviedb.org) |
 | Builds | [EAS Build](https://docs.expo.dev/build/introduction/) + Expo Dev Client |
@@ -153,6 +155,10 @@ rewrite), so setup is:
    `EXPO_PUBLIC_TMDB_API_KEY`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
 3. **Deploy.** Every push to the repo auto-builds and publishes. Your site is at `https://<name>.netlify.app`
    (add a custom domain under **Domain management** if you like).
+4. **Turn off the "Powered by Netlify" badge.** On Free-plan sites created on/after Aug 19, 2026, Netlify
+   injects this badge at its edge (it's not part of the build). On phones, especially an iPhone home-screen
+   app, it sits over the right end of the tab bar and blocks Series/Stats. Go to **Project configuration →
+   General → Powered by Netlify badge → Off**. The change applies on the next request, with no redeploy.
 
 ### Hosting notes
 
@@ -234,8 +240,16 @@ npm run apk          # → ./SeenIt-v<versionCode>.apk  (signed, standalone, key
 ```
 
 This runs [`scripts/build-apk.ps1`](./scripts/build-apk.ps1): it restores the release keystore if needed,
-runs `gradlew assembleRelease`, and copies the artifact to `SeenIt-v<versionCode>.apk`. Copy that file to
+syncs the expo-updates (OTA) native config from `app.json`, regenerates the embedded update manifest, runs
+`gradlew assembleRelease`, and copies the artifact to `SeenIt-v<versionCode>.apk`. Copy that file to
 the phone, tap it, and choose **Install/Update**.
+
+> **Why the manifest is regenerated:** expo-updates launches whichever update is newest by commit time —
+> the JS embedded in the APK or a downloaded OTA. Gradle otherwise treats the embedded manifest as
+> up-to-date forever, so every APK carried an old timestamp and was silently replaced by the last
+> published OTA from its second launch. Now a fresh APK always runs its own JS; only OTAs published
+> **after** the build replace it. The script fails the build if the APK's embedded manifest is older
+> than the build.
 
 #### Delivering updates without data loss ⚠️
 
@@ -253,8 +267,27 @@ Installing a newer APK **over** the existing app is an in-place **update** — y
 
 Data is lost only if you **uninstall first** or the **signing key changes**. As a belt-and-suspenders
 backup before any update, use **Settings → Export data** (round-trips through **Import data**). The
-installed version is shown at the bottom of **Settings** (`v1.0.1 (build 2)`) so you can confirm an update
+installed version is shown at the bottom of **Settings** (`v1.0.6 (build 7)`) so you can confirm an update
 applied.
+
+#### Shipping updates — OTA for JS, a new APK only for native changes
+
+Installed APKs (build 7+) check EAS Update (channel `production`) on launch and download newer JS
+**over the air**; it applies on the next launch. The website redeploys from `main` on its own (Netlify).
+
+- **JS-only changes** (screens, logic, styles) — no new APK. After pushing, publish an OTA:
+  ```bash
+  eas update --channel production --environment production --platform android --message "What changed"
+  ```
+  `--environment production` bakes the EAS `production` variables (TMDB + Supabase) into the bundle.
+- **Native changes** (a package with native code, an Expo SDK upgrade, native settings in `app.json`) —
+  bump `runtimeVersion` in `app.json` **and** ship a new APK (bump `versionCode`, `npm run apk`). OTAs
+  only reach binaries with the same `runtimeVersion`; JS that needs a native module an older APK lacks
+  would crash it on launch.
+- **Announcing a new APK** — **Settings → Check for updates** compares the installed `versionCode` with
+  `update-manifest.json` on `main` (shape: [`update-manifest.example.json`](./update-manifest.example.json)).
+  Upload the APK as a GitHub Release asset **first**, then commit the manifest (`versionCode`,
+  `versionName`, and the asset's `https` download URL as `apkUrl`), so it never points at a missing file.
 
 > If `android/` is ever regenerated (`expo prebuild`), restore `credentials/seenit-release.keystore` into
 > `android/app/` and re-apply the `signingConfigs.release` block before building — see
@@ -290,14 +323,18 @@ src/
     movie/[id].tsx         # movie detail + watched toggle
     show/[id].tsx          # show detail + per-episode tracking
     onboarding.tsx         # first-launch welcome (import or start fresh)
-    settings.tsx           # Settings: import / export data (room for more)
+    settings.tsx           # Settings: account & sync, appearance, import/export
     import.tsx             # import flow (pick ZIP → resolve → report)
   api/
     tmdb.ts                # typed fetch client
     queries.ts             # TanStack Query hooks
+    supabase.ts            # Supabase client (auth + sync)
   store/
     useLibraryStore.ts     # Zustand store (watchlist, watched, tracked shows)
     storage.ts             # MMKV adapter for Zustand persist
+    useAuth.ts             # Supabase auth / session state
+    sync.ts                # cloud sync (push/pull + scheduler)
+    mergeLibraries.ts      # conflict-free (LWW) library merge
   components/              # PosterImage, MediaCard, EpisodeRow, etc. (NativeWind)
   lib/                     # image URLs, normalization, hooks
     tvtimeImport.ts        # import: unzip + parse + TMDB resolve + report
@@ -323,9 +360,9 @@ src/
 
 ## 🔮 Roadmap Ideas
 
-- Optional cloud sync of watch history (e.g. via [Trakt](https://trakt.tv)).
-- Filtering / sorting the library; "continue watching" shelf.
+- More import sources (e.g. [Trakt](https://trakt.tv), Letterboxd).
 - Home-screen widgets and share extensions.
+- Notifications when a new episode or season of a show you're watching airs.
 
 ---
 
@@ -350,6 +387,7 @@ src/
   the importer reads, adding an `id.tmdb` to each item. The importer prefers `id.tmdb` when present
   (skipping the `/find` lookup), so a Seen It export round-trips through the exact same import
   pipeline, while real TV Time exports still resolve via imdb/tvdb.
+- **Accounts & cross-device sync.** Signing in with Supabase (email + password, plus a username) turns on sync. The library is modeled as a **last-writer-wins element set**: `store/mergeLibraries.ts` merges local and cloud state commutatively — watched movies, per-episode sets, the watchlist, and show status each resolve independently, with **tombstones** so a delete on one device isn't resurrected by another — and `store/sync.ts` pushes/pulls on edits and app-foreground. It stays **offline-first** (everything works without a connection and reconciles on reconnect), and **Row-Level Security** keeps each account's rows private.
 - **Appearance / dark mode.** The preference (`system` / `light` / `dark`) is persisted in the Zustand
   store; the root layout applies it via NativeWind's `setColorScheme(pref)` (which drives all `dark:`
   variants) and reads the resolved scheme back to pick the navigation `ThemeProvider`

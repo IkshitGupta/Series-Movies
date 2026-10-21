@@ -18,8 +18,9 @@ import { SelectChip } from '@/components/SelectChip';
 import { DetailHeaderSkeleton } from '@/components/Skeleton';
 import { Tag } from '@/components/Tag';
 import { WatchlistButton } from '@/components/WatchlistButton';
-import { getUpcoming, airedEpisodeCount, hasEpisodeAired, upcomingLabel } from '@/lib/airing';
+import { getUpcoming, airedEpisodeCount, hasEpisodeAired, statusEpisodeTotal, upcomingLabel } from '@/lib/airing';
 import { tvToMediaItem } from '@/lib/normalize';
+import { noteNextAirDate } from '@/lib/showRefresh';
 import { getTvCertification, normalizeRecommendations } from '@/lib/tmdbExtras';
 import {
   formatWatchTime,
@@ -194,16 +195,21 @@ export default function ShowDetailScreen() {
   // which keeps SeasonEpisodes' per-row callbacks (and their memoized rows) stable.
   const memoItem = useMemo(() => (show ? tvToMediaItem(show) : null), [show]);
 
-  // Keep episode totals in sync with TMDB: totalEpisodes (incl. announced) so a
-  // new season flips a completed show back to watching, and airedEpisodes so
-  // progress ignores unaired future episodes.
+  // Keep episode totals in sync with TMDB: the status total (episodes of seasons
+  // that have started airing) so a finished show flips back to Watching once its
+  // new season premieres, and airedEpisodes so progress ignores unaired episodes.
+  // Runs when the TMDB data changes or tracking starts — not on every library
+  // change, so a newer total synced from another device isn't overwritten with
+  // this possibly older cached copy (`refreshShowTotals` re-checks it fresh).
+  const isTracked = !!tracked;
   useEffect(() => {
-    if (!tracked || !show) return;
+    if (!isTracked || !show) return;
     syncShowMeta(showId, {
-      totalEpisodes: show.number_of_episodes,
+      totalEpisodes: statusEpisodeTotal(show),
       airedEpisodes: airedEpisodeCount(show) ?? undefined,
     });
-  }, [tracked, show, showId, syncShowMeta]);
+    noteNextAirDate(showId, show);
+  }, [isTracked, show, showId, syncShowMeta]);
 
   // Per-episode runtime for the whole-show total estimate. TMDB's show-level
   // `episode_run_time` is frequently empty, so fall back to the average runtime
@@ -250,6 +256,8 @@ export default function ShowDetailScreen() {
   if (!memoItem) return null;
   const item = memoItem;
   const total = show.number_of_episodes;
+  // What tracking actions store as the show's total (drives Watching/Completed).
+  const statusTotal = statusEpisodeTotal(show);
   // Best-effort whole-show runtime: per-episode runtime (from the show, or the
   // avg we stored when a season was viewed) × episode count. Shown as an estimate.
   const perEpisodeRuntime =
@@ -323,7 +331,7 @@ export default function ShowDetailScreen() {
     setBusy('series');
     try {
       const keys = await fetchEpisodeKeys(seasons.map((s) => s.season_number));
-      markEpisodesWatched(item, total, keys);
+      markEpisodesWatched(item, statusTotal, keys);
     } finally {
       setBusy(null);
     }
@@ -340,7 +348,7 @@ export default function ShowDetailScreen() {
         season: seasonNumber,
         episode: episodeNumber,
       });
-      markEpisodesWatched(item, total, keys);
+      markEpisodesWatched(item, statusTotal, keys);
     } finally {
       setBusy(null);
     }
@@ -432,7 +440,10 @@ export default function ShowDetailScreen() {
           </Pressable>
         </View>
 
-        {status !== 'completed' ? (
+        {/* Hidden for completed shows — unless a manual status is set, so it can
+            always be cleared (a show flagged while waiting for an announced season
+            counts as completed until that season premieres). */}
+        {status !== 'completed' || userStatus ? (
           <View className="gap-2 px-4 pb-2">
             <Text className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">
               Status
@@ -445,7 +456,7 @@ export default function ShowDetailScreen() {
                     key={opt.key}
                     label={opt.label}
                     active={active}
-                    onPress={() => setShowStatus(item, total, active ? null : opt.key)}
+                    onPress={() => setShowStatus(item, statusTotal, active ? null : opt.key)}
                   />
                 );
               })}
@@ -493,7 +504,7 @@ export default function ShowDetailScreen() {
 
         <SeasonEpisodes
           item={item}
-          totalEpisodes={total}
+          totalEpisodes={statusTotal}
           seasonNumber={activeSeason}
           onWatchTillHere={markTillHere}
           busy={busy}
