@@ -21,7 +21,7 @@ Built as a modern, cross-platform (iOS + Android) React Native app.
 - 🗂️ **Separate Movies and Series tabs** — watched movies in one tab; series split into **4 views** with counts: *Watching · Completed · Stopped watching · Continue later*. *Completed* has an **Upcoming** filter: finished shows with a confirmed date for a new season or episode, soonest first.
 - ↕️ **Sort your lists** — the **Movies**, **Series**, and **Watchlist** tabs each have a compact sort bar: **Recent** (default), **Title (A–Z)**, or **Release year**. Tap the active chip to flip the direction (↑/↓). Resets to Recent each launch.
 - 🗓️ **Upcoming seasons/episodes** — shows still airing display a badge in the Series list and a banner on the show screen (from TMDB): **"New season · &lt;date&gt;"** / **"New episode · &lt;date&gt;"** when a date is known, or **"New season coming"** when the show is renewed/ongoing but nothing is scheduled yet. Airing shows also refresh more often than finished ones. Progress counts only **episodes released so far**, so announced-but-unaired episodes aren't shown as "remaining" (e.g. 20/21, not 20/26). Unreleased titles show their date too: a **"Releases &lt;date&gt;"** / **"Premieres &lt;date&gt;"** badge in Search, and a release-date banner on a movie's page (it can be marked watched from that day).
-- 📊 **Stats** — totals, **total watch time**, a per-genre breakdown, and a **Top actors & actresses** list built from the cast of everything you've watched — tracked separately for movies and TV shows. The genre list shows your **top 6** genres with a **Show all / Show less** toggle. Tap any genre to see the titles in it.
+- 📊 **Stats** — totals, **total watch time**, a per-genre breakdown, and a **Top actors & actresses** list built from the cast of everything you've watched — tracked separately for movies and TV shows. The genre list shows your **top 6** genres with a **Show all / Show less** toggle. Tap any genre to see the titles in it. The actor card shows your top 6; **Show top 150** (or the 🔍 icon) opens the full ranked list, where ties share a rank, with a **search** that ignores case, accents and word order ("penelope" finds Penélope Cruz).
 - 🎭 **Genres** shown on both movie and TV detail screens.
 - 📥 **Import your library** — from **Settings → Import data** (or first-launch onboarding) you can bring in a **data export** (a `.zip` of JSON files). It imports your watched **movies and TV episodes**, maps each title to TMDB, mirrors your per-show status (*stopped* → Stopped watching, *watch later* → Continue later), adds not-yet-started titles to your **watchlist**, and lists anything it couldn't match with a downloadable **CSV report**.
 - 📤 **Export / backup** — **Settings → Export data** saves your whole library to a `.zip` in the **same format the importer reads**, so you can back it up or move devices and re-import it (round-trip). Exported items carry their TMDB id, so re-importing resolves instantly and losslessly.
@@ -125,7 +125,11 @@ and the web automatically.
 
 **Feature parity:** search, movie/TV detail, per-episode tracking, watchlist, stats, dark mode, accounts
 + cross-device sync, and **import/export** (the file picker uses the browser's native dialog; the import
-CSV report and library ZIP download as normal browser downloads).
+CSV report and library ZIP download as normal browser downloads). Messages and confirmations (e.g.
+"Unsynced changes — sign out anyway?") use the browser's `alert`/`confirm` dialogs, because React Native
+Web's `Alert.alert` does nothing; app code calls `showAlert` / `showConfirm` (`src/lib/alert.ts` /
+`alert.web.ts`). A dialog requested while the tab is hidden waits until it's visible again, since Chrome
+drops `confirm()` from background tabs.
 
 ### Run in development
 
@@ -319,9 +323,10 @@ src/
       watchlist.tsx        # single "To Watch" list
       movies.tsx           # watched movies
       series.tsx           # tracked series (4 views)
-      stats.tsx            # totals + genre breakdown
+      stats.tsx            # totals + genre breakdown + top actors card
     movie/[id].tsx         # movie detail + watched toggle
     show/[id].tsx          # show detail + per-episode tracking
+    actors.tsx             # top 150 actors & actresses: ranked list + search
     onboarding.tsx         # first-launch welcome (import or start fresh)
     settings.tsx           # Settings: account & sync, appearance, import/export
     import.tsx             # import flow (pick ZIP → resolve → report)
@@ -387,7 +392,7 @@ src/
   the importer reads, adding an `id.tmdb` to each item. The importer prefers `id.tmdb` when present
   (skipping the `/find` lookup), so a Seen It export round-trips through the exact same import
   pipeline, while real TV Time exports still resolve via imdb/tvdb.
-- **Accounts & cross-device sync.** Signing in with Supabase (email + password, plus a username) turns on sync. The library is modeled as a **last-writer-wins element set**: `store/mergeLibraries.ts` merges local and cloud state commutatively — watched movies, per-episode sets, the watchlist, and show status each resolve independently, with **tombstones** so a delete on one device isn't resurrected by another — and `store/sync.ts` pushes/pulls on edits and app-foreground. It stays **offline-first** (everything works without a connection and reconciles on reconnect), and **Row-Level Security** keeps each account's rows private.
+- **Accounts & cross-device sync.** Signing in with Supabase (email + password, plus a username) turns on sync. The library is modeled as a **last-writer-wins element set**: `store/mergeLibraries.ts` merges local and cloud state commutatively — watched movies, per-episode sets, the watchlist, and show status each resolve independently, with **tombstones** so a delete on one device isn't resurrected by another — and `store/sync.ts` pushes/pulls on edits and app-foreground. It stays **offline-first** (everything works without a connection and reconciles on reconnect: when the cloud can't be reached, a sync retries with growing pauses (5 s, 10 s, 20 s, then 30 s between attempts) while the app is open, and the website also tries as soon as the browser reports it's back online), and **Row-Level Security** keeps each account's rows private.
 - **Appearance / dark mode.** The preference (`system` / `light` / `dark`) is persisted in the Zustand
   store; the root layout applies it via NativeWind's `setColorScheme(pref)` (which drives all `dark:`
   variants) and reads the resolved scheme back to pick the navigation `ThemeProvider`
@@ -397,6 +402,16 @@ src/
   screen's title, and since `(tabs)` has `headerShown:false`/no title it leaked the raw route name
   "(tabs)". The root `Stack` sets `headerBackButtonDisplayMode: 'minimal'` (chevron only) to avoid this.
   (Android hides back-button labels, so this only reproduces on iOS.)
+- **Deep links, reloads & the account gate.** The root `Stack` anchors the `(tabs)` group
+  (`unstable_settings.anchor`), so a screen opened directly — a deep link, a page reload, or iOS restoring
+  the home-screen web app — still has a back button to the tabs. Every other stack screen (settings,
+  import, onboarding, detail pages, top actors) sits in a `Stack.Protected` group with the tabs' rule:
+  signed in, and the local library belongs to that account. Otherwise the router falls back to the tabs,
+  which send you to sign in, so a direct link on a signed-out (shared) browser never shows the previous
+  account's library. While the session check runs, the guard stays open (so a deep link isn't dropped)
+  and `screenLayout` keeps screens blank; the navigator itself renders from the start. Screens that go
+  back to the tabs use `router.dismissTo('/(tabs)')` (`RedirectToTabs`), which pops to the tabs already
+  underneath instead of stacking a second copy.
 - **Storage efficiency.** The whole library persists as one JSON blob under a single MMKV key, so every
   mutation rewrites it. To keep MMKV's append log (and file) from bloating, `store/persistDebounce.ts`
   coalesces rapid successive writes into one, `_layout.tsx` flushes any pending write on app background

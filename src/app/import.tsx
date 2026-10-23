@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { showAlert } from '@/lib/alert';
 import { saveOrShare } from '@/lib/download';
 import { readDocumentBytes } from '@/lib/pickFile';
 import {
@@ -86,13 +87,14 @@ export default function ImportScreen() {
         dialogTitle: 'Items not imported',
       });
     } catch {
-      Alert.alert('Could not export the report', 'Please try again.');
+      showAlert('Could not export the report', 'Please try again.');
     }
   };
 
   const finish = () => {
     setOnboarded(true);
-    router.replace('/(tabs)');
+    // Back to the tabs underneath (from Settings, or after a reload), else replace.
+    router.dismissTo('/(tabs)');
   };
 
   // -- Working (progress) ---------------------------------------------------

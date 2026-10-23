@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { hasSupabase, supabase } from '@/api/supabase';
+import { RedirectToTabs } from '@/components/RedirectToTabs';
 import { useAuth, friendlyAuthError, validateUsername } from '@/store/useAuth';
 import { COLORS } from '@/theme/colors';
 
@@ -28,9 +28,9 @@ export default function AuthScreen() {
   const [error, setError] = useState<string | null>(null);
 
   // If Supabase isn't configured, don't trap the user on a login screen.
-  if (!hasSupabase()) return <Redirect href="/(tabs)" />;
+  if (!hasSupabase()) return <RedirectToTabs />;
   // Once authenticated, the session-based redirect sends the user into the app.
-  if (!loading && session) return <Redirect href="/(tabs)" />;
+  if (!loading && session) return <RedirectToTabs />;
 
   const submit = async () => {
     const mail = email.trim();

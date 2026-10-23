@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useShow } from '@/api/queries';
 import { EmptyState } from '@/components/EmptyState';
@@ -11,6 +11,7 @@ import { SelectChip } from '@/components/SelectChip';
 import { SortBar } from '@/components/SortBar';
 import { StatusBadge } from '@/components/StatusBadge';
 import { airedEpisodeCount, getUpcoming, localTodayIso, statusEpisodeTotal, upcomingLabel } from '@/lib/airing';
+import { showAlert } from '@/lib/alert';
 import { findNextEpisode, nextUnwatchedEpisode } from '@/lib/nextEpisode';
 import { noteNextAirDate, refreshShowTotals, useShowSchedule } from '@/lib/showRefresh';
 import { DEFAULT_SORT, sortLibraryItems, type SortState } from '@/lib/sort';
@@ -243,7 +244,7 @@ export default function SeriesScreen() {
     try {
       const next = await findNextEpisode(queryClient, show.id, show.watchedEpisodes);
       if (!next) {
-        Alert.alert('All caught up', 'You’ve watched every episode that has aired so far.');
+        showAlert('All caught up', 'You’ve watched every episode that has aired so far.');
         return;
       }
       // Idempotent set-union (not a toggle) so a concurrent sync that already
@@ -259,7 +260,7 @@ export default function SeriesScreen() {
         setTvFilter('watching');
       }
     } catch {
-      Alert.alert('Could not mark next episode', 'Please check your connection and try again.');
+      showAlert('Could not mark next episode', 'Please check your connection and try again.');
     } finally {
       setBusyId(null);
     }

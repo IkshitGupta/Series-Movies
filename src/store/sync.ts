@@ -1,5 +1,6 @@
+import { isAuthRetryableFetchError } from '@supabase/supabase-js';
 import { useEffect } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { create } from 'zustand';
 
 import { hasSupabase, supabase } from '@/api/supabase';
@@ -185,6 +186,12 @@ let rerun = false;
 /** Resolvers for `syncNow` calls that coalesced into the in-flight run; resolved
  * with the authoritative final result so callers (e.g. sign-out) can trust it. */
 const waiters: ((ok: boolean) => void)[] = [];
+/** Syncs in a row that failed because the cloud couldn't be reached (offline,
+ * server down). Such a failure is retried with growing pauses: 5 s, 10 s, 20 s,
+ * then 30 s between attempts. Native has no "back online" event without a native
+ * module, so this retry is what uploads changes made offline once the connection
+ * returns. */
+let failureStreak = 0;
 
 /** Max compare-and-swap attempts before giving up (and retrying later) rather
  * than blindly overwriting a concurrent write. */
@@ -195,18 +202,34 @@ function isUniqueViolation(e: unknown): boolean {
 }
 
 /**
+ * A failure that may clear up by itself: no response at all (offline, DNS, a
+ * dropped connection — postgrest-js reports status 0), a timeout, rate limit or
+ * server error, or a token refresh that couldn't reach the server. A request the
+ * server rejected, or a bug, would fail the same way again. `pullMergePush`
+ * throws PostgREST errors with the response's `status` attached.
+ */
+function isTransient(e: unknown): boolean {
+  if (isAuthRetryableFetchError(e)) return true;
+  const status = (e as { status?: unknown } | null)?.status;
+  return (
+    typeof status === 'number' &&
+    (status === 0 || status === 408 || status === 429 || status >= 500)
+  );
+}
+
+/**
  * One pull → merge → push cycle with an optimistic-concurrency push. Returns
  * `'ok'` when the merged result was persisted, or `'conflict'` when another
  * device wrote in between (so the caller should re-pull + re-merge + retry).
  * Throws on a real error.
  */
 async function pullMergePush(userId: string, gen: number): Promise<'ok' | 'conflict' | 'stale'> {
-  const { data: row, error: pullError } = await supabase
-    .from(TABLE)
-    .select('data, updated_at')
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (pullError) throw pullError;
+  const {
+    data: row,
+    error: pullError,
+    status: pullStatus,
+  } = await supabase.from(TABLE).select('data, updated_at').eq('user_id', userId).maybeSingle();
+  if (pullError) throw Object.assign(pullError, { status: pullStatus });
   // The account changed under us (another sign-in ran `ensureOwner`) — abort
   // before merging this account's cloud data into the new account's store.
   if (authGen !== gen || useLibraryStore.getState().ownerId !== userId) return 'stale';
@@ -226,18 +249,20 @@ async function pullMergePush(userId: string, gen: number): Promise<'ok' | 'confl
     // First write for this account: INSERT only. If another device inserted
     // first, we get a unique-violation and retry (pulling + merging its data)
     // instead of blindly overwriting it.
-    const { error } = await supabase.from(TABLE).insert({ user_id: userId, data, updated_at: stamp });
+    const { error, status } = await supabase
+      .from(TABLE)
+      .insert({ user_id: userId, data, updated_at: stamp });
     if (!error) return 'ok';
     if (isUniqueViolation(error)) return 'conflict';
-    throw error;
+    throw Object.assign(error, { status });
   }
 
   // Compare-and-swap on the pulled `updated_at` token (legacy rows may have a
   // null token — match on null once to establish one).
   let q = supabase.from(TABLE).update({ data, updated_at: stamp }).eq('user_id', userId);
   q = row.updated_at == null ? q.is('updated_at', null) : q.eq('updated_at', row.updated_at);
-  const { data: updated, error: pushError } = await q.select('user_id');
-  if (pushError) throw pushError;
+  const { data: updated, error: pushError, status: pushStatus } = await q.select('user_id');
+  if (pushError) throw Object.assign(pushError, { status: pushStatus });
   return updated && updated.length > 0 ? 'ok' : 'conflict';
 }
 
@@ -254,13 +279,24 @@ export async function syncNow(): Promise<boolean> {
     return new Promise<boolean>((resolve) => waiters.push(resolve));
   }
   running = true;
+  // This run pushes the current library, so a pending debounced push or retry
+  // would only repeat it.
+  if (pushTimer) {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+  }
   useSyncStatus.setState({ phase: 'syncing', error: null });
   let ok = false;
   let exhausted = false;
+  let retry = false;
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     const userId = sessionData.session?.user?.id;
+    // An expired access token that can't be refreshed (e.g. offline) comes back
+    // as no session plus an error: a failed sync to retry, not a sign-out.
+    if (!userId && sessionError) throw sessionError;
     if (!userId) {
+      failureStreak = 0;
       useSyncStatus.setState({ phase: 'idle' });
       // fall through (don't early-return) so `rerun`/waiters are still handled.
     } else {
@@ -276,12 +312,14 @@ export async function syncNow(): Promise<boolean> {
       }
       if (result === 'ok') {
         exhaustionStreak = 0;
+        failureStreak = 0;
         useSyncStatus.setState({ phase: 'idle', lastSyncedAt: Date.now(), error: null });
         ok = true;
       } else if (result === 'stale') {
         // Account switched mid-sync — the follow-up run (rerun) handles the new
         // account. Do nothing here.
         exhaustionStreak = 0;
+        failureStreak = 0;
         useSyncStatus.setState({ phase: 'idle', error: null });
       } else {
         // Persistent contention. Never blind-overwrite (that risks dropping the
@@ -290,6 +328,7 @@ export async function syncNow(): Promise<boolean> {
         // (e.g. an RLS policy blocks UPDATE), surface an error instead of hot-looping.
         exhausted = true;
         exhaustionStreak += 1;
+        failureStreak = 0;
         if (exhaustionStreak >= 3) {
           useSyncStatus.setState({ phase: 'error', error: 'Couldn’t save changes to the cloud. Retrying…' });
         } else {
@@ -299,6 +338,10 @@ export async function syncNow(): Promise<boolean> {
     }
   } catch (e) {
     exhaustionStreak = 0;
+    // Only a failure that may clear up by itself is retried on a timer; a rejected
+    // request waits for the next edit, foreground, reconnect or manual retry.
+    retry = isTransient(e);
+    failureStreak = retry ? failureStreak + 1 : 0;
     useSyncStatus.setState({ phase: 'error', error: errMessage(e) });
     ok = false;
   } finally {
@@ -317,6 +360,9 @@ export async function syncNow(): Promise<boolean> {
     } else if (rerun) {
       rerun = false;
       finalOk = await syncNow().catch(() => false); // the recursive call drains the shared waiters
+    } else if (retry && !pushTimer) {
+      // An edit made during this run has already scheduled a sooner push.
+      schedulePush(Math.min(5000 * 2 ** (failureStreak - 1), 30000));
     }
   } finally {
     const queued = waiters.splice(0);
@@ -343,8 +389,9 @@ function schedulePush(delayMs = 2500): void {
 
 /**
  * Drives sync from the app root: reconciles ownership + pulls on sign-in, pushes
- * (debounced) after local edits, and re-syncs when the app returns to the
- * foreground. Mount once near the top of the tree.
+ * (debounced) after local edits, re-syncs when the app returns to the foreground
+ * and, on the web, as soon as the browser is back online. A failed sync retries
+ * itself (see `failureStreak`). Mount once near the top of the tree.
  */
 export function useSyncEngine(): void {
   const { session, loading } = useAuth();
@@ -385,5 +432,18 @@ export function useSyncEngine(): void {
       if (next === 'active') void syncNow();
     });
     return () => sub.remove();
+  }, [userId]);
+
+  // Web: the browser reports when the connection is back, so sync right away
+  // instead of waiting for the next retry. The backoff starts over, because the
+  // first tries after reconnecting often fail while the network settles.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !hasSupabase() || !userId) return;
+    const onOnline = () => {
+      failureStreak = 0;
+      void syncNow();
+    };
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
   }, [userId]);
 }

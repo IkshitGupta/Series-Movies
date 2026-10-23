@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { type ComponentProps, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { CastFilterTabs } from '@/components/CastFilterTabs';
 import { EmptyState } from '@/components/EmptyState';
 import { ProgressBar } from '@/components/ProgressBar';
 import { runCastBackfill, useCastBackfillStatus } from '@/lib/castBackfill';
@@ -124,18 +125,11 @@ function StatsSection({
   );
 }
 
-const CAST_FILTERS: { key: CastFilter; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'movie', label: 'Movies' },
-  { key: 'tv', label: 'TV' },
-];
-
 function TopCastSection() {
   const router = useRouter();
   const watchedMovies = useLibraryStore((s) => s.watchedMovies);
   const trackedShows = useLibraryStore((s) => s.trackedShows);
   const [filter, setFilter] = useState<CastFilter>('all');
-  const [expanded, setExpanded] = useState(false);
   const backfilling = useCastBackfillStatus((s) => s.running);
   const remaining = useCastBackfillStatus((s) => s.remaining);
   const COLLAPSED_COUNT = 6;
@@ -145,43 +139,36 @@ function TopCastSection() {
     [watchedMovies, trackedShows, filter],
   );
   const max = cast[0]?.count ?? 0;
-  const visible = expanded ? cast : cast.slice(0, COLLAPSED_COUNT);
+  const visible = cast.slice(0, COLLAPSED_COUNT);
   const hasMore = cast.length > COLLAPSED_COUNT;
+  const openFullList = (focusSearch: boolean) =>
+    router.push({
+      pathname: '/actors',
+      params: focusSearch ? { filter, focus: '1' } : { filter },
+    });
 
   return (
     <View className="gap-3 rounded-2xl border border-neutral-100 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
       <View className="flex-row items-center gap-2">
         <Ionicons name="people-outline" size={18} color={COLORS.brand} />
-        <Text className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
+        <Text className="flex-1 text-base font-semibold text-neutral-900 dark:text-neutral-50">
           Top actors &amp; actresses
         </Text>
+        {cast.length > 0 ? (
+          <Pressable
+            onPress={() => openFullList(true)}
+            role="button"
+            aria-label="Search top actors & actresses"
+            // Padding, not hitSlop (react-native-web ignores it), widens the tap
+            // target; the negative margin keeps the layout.
+            style={{ margin: -10, padding: 10 }}
+            className="active:opacity-60">
+            <Ionicons name="search" size={18} color={COLORS.brand} />
+          </Pressable>
+        ) : null}
       </View>
 
-      <View className="flex-row gap-1 rounded-2xl bg-neutral-200 p-1 dark:bg-neutral-800">
-        {CAST_FILTERS.map((f) => {
-          const active = filter === f.key;
-          return (
-            <Pressable
-              key={f.key}
-              onPress={() => {
-                setFilter(f.key);
-                setExpanded(false);
-              }}
-              style={{
-                flex: 1,
-                alignItems: 'center',
-                borderRadius: 12,
-                paddingVertical: 8,
-                backgroundColor: active ? COLORS.white : 'transparent',
-              }}>
-              <Text
-                style={{ fontSize: 13, fontWeight: '600', color: active ? COLORS.brand : COLORS.mutedDark }}>
-                {f.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <CastFilterTabs value={filter} onChange={setFilter} />
 
       {cast.length === 0 ? (
         <View className="flex-row items-center gap-2 py-1">
@@ -222,17 +209,15 @@ function TopCastSection() {
           ))}
           {hasMore ? (
             <Pressable
-              onPress={() => setExpanded((v) => !v)}
+              onPress={() => openFullList(false)}
               accessibilityRole="button"
               className="flex-row items-center justify-center gap-1 pt-1 active:opacity-60">
               <Text className="text-sm font-semibold text-brand">
-                {expanded
-                  ? 'Show less'
-                  : cast.length >= TOP_CAST_LIMIT
-                    ? `Show top ${TOP_CAST_LIMIT}`
-                    : `Show all ${cast.length}`}
+                {cast.length >= TOP_CAST_LIMIT
+                  ? `Show top ${TOP_CAST_LIMIT}`
+                  : `Show all ${cast.length}`}
               </Text>
-              <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.brand} />
+              <Ionicons name="chevron-forward" size={14} color={COLORS.brand} />
             </Pressable>
           ) : null}
           {backfilling ? (

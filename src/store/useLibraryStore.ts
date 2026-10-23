@@ -974,6 +974,24 @@ export function getTopCast(
   return subset.sort(cmp).slice(0, TOP_CAST_LIMIT);
 }
 
+export interface RankedCast extends CastCount {
+  /** Competition rank: 1 + the number of actors with a higher count (ties share). */
+  rank: number;
+}
+
+/**
+ * Number a count-descending list (as returned by {@link getTopCast}) with shared
+ * ranks for ties: 12, 12, 14. `getTopCast` keeps every actor with a higher count
+ * ahead of a lower one, so these match the actor's rank across the whole library.
+ */
+export function rankCast(list: readonly CastCount[]): RankedCast[] {
+  let rank = 0;
+  return list.map((c, i) => {
+    if (i === 0 || c.count !== list[i - 1].count) rank = i + 1;
+    return { ...c, rank };
+  });
+}
+
 /** Format a minutes total as "Xd Yh" / "Yh Zm" / "Zm". */
 export function formatWatchTime(minutes: number): string {
   if (minutes <= 0) return '—';

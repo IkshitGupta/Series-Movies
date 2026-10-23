@@ -7,12 +7,14 @@ interface SearchBarProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
+  autoFocus?: boolean;
 }
 
 export function SearchBar({
   value,
   onChangeText,
   placeholder = 'Search movies & shows',
+  autoFocus,
 }: SearchBarProps) {
   return (
     <View className="flex-row items-center gap-2 rounded-2xl bg-neutral-100 px-3 dark:bg-neutral-800">
@@ -22,6 +24,7 @@ export function SearchBar({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={COLORS.muted}
+        autoFocus={autoFocus}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"

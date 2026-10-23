@@ -6,15 +6,27 @@ import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'nativewind';
 import { useEffect } from 'react';
-import { AppState } from 'react-native';
+import { AppState, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { hasSupabase } from '@/api/supabase';
 import { flushQueryCache, hydrateQueryCache, startQueryCachePersistence } from '@/store/queryPersist';
 import { flushPendingWrites, trimStorage } from '@/store/storage';
 import { useSyncEngine } from '@/store/sync';
-import { useLibraryStore } from '@/store/useLibraryStore';
+import { useAuth } from '@/store/useAuth';
+import { useLibraryStore, useStoreHydrated } from '@/store/useLibraryStore';
 
 import { WebFrame } from '@/components/WebFrame';
+
+export const unstable_settings = {
+  // A deep link or reload straight into a stack screen (e.g. /actors after iOS
+  // reloads the home-screen web app) opens with the tabs underneath, so the
+  // back button always has somewhere to go.
+  anchor: '(tabs)',
+};
+
+/** Blank screen body shown until the session check finishes (see RootLayout). */
+const holdLayout = () => <View style={{ flex: 1 }} />;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +48,20 @@ hydrateQueryCache(queryClient);
 export default function RootLayout() {
   const { colorScheme, setColorScheme } = useColorScheme();
   const theme = useLibraryStore((s) => s.theme);
+  const hydrated = useStoreHydrated();
+  const ownerId = useLibraryStore((s) => s.ownerId);
+  const { session, loading: authLoading } = useAuth();
+  const userId = session?.user.id;
+  const ready = hydrated && !authLoading;
+
+  // Screens outside the tabs show the library too, so they follow the tabs'
+  // account rule: signed in, and the local library isn't still another
+  // account's. Otherwise the router falls back to the tabs, which send the user
+  // to sign in (or hold while an account switch finishes). Until the session
+  // check finishes the guard stays open, so a deep link isn't dropped, and
+  // `holdLayout` keeps every screen blank.
+  const canOpenLibrary =
+    !ready || !hasSupabase() || (userId != null && (ownerId == null || ownerId === userId));
 
   // Keep the local library mirrored to the signed-in account across devices.
   useSyncEngine();
@@ -84,17 +110,31 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
             <WebFrame isDark={isDark}>
-              <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
+              {/* Render the navigator from the first render, not after the session
+                  check: a navigator that mounts later re-applies its initial state
+                  after the opened screen's first effects, undoing e.g. the actors
+                  screen dropping its `focus` param. */}
+              <Stack
+                screenOptions={{
+                  headerBackButtonDisplayMode: 'minimal',
+                  ...(ready ? null : { headerShown: false }),
+                }}
+                screenLayout={ready ? undefined : holdLayout}>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="auth" options={{ headerShown: false }} />
-                <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-                <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-                <Stack.Screen name="import" options={{ title: 'Import data' }} />
-                <Stack.Screen name="movie/[id]" options={{ title: 'Movie' }} />
-                <Stack.Screen name="show/[id]" options={{ title: 'Show' }} />
-                <Stack.Screen name="genre/[type]" options={{ title: 'Genre' }} />
-                <Stack.Screen name="person/[id]" options={{ title: 'Cast' }} />
-                <Stack.Screen name="keyword/[id]" options={{ title: 'Theme' }} />
+                {/* Routes not listed here are open to everyone, so any new screen
+                    that shows the library belongs in this group. */}
+                <Stack.Protected guard={canOpenLibrary}>
+                  <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+                  <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+                  <Stack.Screen name="import" options={{ title: 'Import data' }} />
+                  <Stack.Screen name="movie/[id]" options={{ title: 'Movie' }} />
+                  <Stack.Screen name="show/[id]" options={{ title: 'Show' }} />
+                  <Stack.Screen name="genre/[type]" options={{ title: 'Genre' }} />
+                  <Stack.Screen name="person/[id]" options={{ title: 'Cast' }} />
+                  <Stack.Screen name="actors" options={{ title: 'Top actors & actresses' }} />
+                  <Stack.Screen name="keyword/[id]" options={{ title: 'Theme' }} />
+                </Stack.Protected>
               </Stack>
             </WebFrame>
             <StatusBar style={isDark ? 'light' : 'dark'} />

@@ -28,11 +28,15 @@ function makeTabIcon(name: IoniconName) {
 function FirstSyncGate({ onContinue }: { onContinue: () => void }) {
   const phase = useSyncStatus((s) => s.phase);
   const [timedOut, setTimedOut] = useState(false);
+  // Keep the buttons once a sync has failed: the automatic retry would otherwise
+  // hide them again while it runs.
+  const [failed, setFailed] = useState(false);
+  if (phase === 'error' && !failed) setFailed(true);
   useEffect(() => {
     const t = setTimeout(() => setTimedOut(true), 8000);
     return () => clearTimeout(t);
   }, []);
-  const stuck = timedOut || phase === 'error';
+  const stuck = timedOut || failed;
   return (
     <View className="flex-1 items-center justify-center gap-4 bg-neutral-50 px-8 dark:bg-black">
       <ActivityIndicator size="large" color={COLORS.brand} />

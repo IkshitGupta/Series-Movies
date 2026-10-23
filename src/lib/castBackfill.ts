@@ -28,6 +28,12 @@ export const useCastBackfillStatus = create<BackfillStatus>(() => ({
 
 let inFlight = false;
 
+/** After an unhealthy run (almost always offline), automatic re-runs for that
+ * account wait this long, so reopening a stats screen doesn't re-fire the same
+ * doomed requests every time. Another account isn't held back. */
+const RETRY_COOLDOWN_MS = 5 * 60 * 1000;
+let retryAfter: { owner: string | null; at: number } | null = null;
+
 /** Selection-rule version the stored cast should be built with. Bump when the
  * cast-selection logic in `topCast` changes, to trigger a one-time re-fetch.
  * v3: re-run after fixing the merge that let a longer legacy cast revert the
@@ -66,6 +72,7 @@ function findTargets(migrating: boolean): Target[] {
 export async function runCastBackfill(): Promise<void> {
   if (inFlight || !hasApiKey()) return;
   const owner = useLibraryStore.getState().ownerId;
+  if (retryAfter && retryAfter.owner === owner && Date.now() < retryAfter.at) return;
   const migrating = (useLibraryStore.getState().castRuleVersion ?? 1) < CAST_RULE_VERSION;
   const targets = findTargets(migrating);
   // Empty library: leave the rule unsealed (nothing to migrate, no work) — it
@@ -163,18 +170,14 @@ export async function runCastBackfill(): Promise<void> {
     // because the failure cap only bounds *consecutive* failures: an intermittent
     // network that sprinkles a success every few requests could otherwise dispatch
     // all targets, fail most, and permanently seal a mostly-unmigrated library.
-    // Offline/aborted or mostly-failed runs retry next time; a healthy run seals
-    // in one pass even with a few residual non-404 errors (those keep their prior
-    // cast and heal via another device's `pickCast` "longer wins").
+    // Offline/aborted or mostly-failed runs retry later (after the cooldown); a
+    // healthy run seals in one pass even with a few residual non-404 errors (those
+    // keep their prior cast and heal via another device's `pickCast` "longer wins").
     const toleratedErrors = Math.max(1, Math.floor(targets.length * 0.05));
-    if (
-      migrating &&
-      useLibraryStore.getState().ownerId === owner &&
-      processed > 0 &&
-      next >= targets.length &&
-      errors <= toleratedErrors
-    ) {
+    const healthy = processed > 0 && next >= targets.length && errors <= toleratedErrors;
+    if (migrating && useLibraryStore.getState().ownerId === owner && healthy) {
       useLibraryStore.getState().setCastRuleVersion(CAST_RULE_VERSION);
     }
+    retryAfter = healthy ? null : { owner, at: Date.now() + RETRY_COOLDOWN_MS };
   }
 }

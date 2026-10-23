@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Redirect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { RedirectToTabs } from '@/components/RedirectToTabs';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { COLORS } from '@/theme/colors';
 
@@ -13,11 +14,11 @@ export default function OnboardingScreen() {
   const setOnboarded = useLibraryStore((s) => s.setOnboarded);
 
   // Never resurface onboarding (e.g. via a back gesture) once it's completed.
-  if (onboarded) return <Redirect href="/(tabs)" />;
+  if (onboarded) return <RedirectToTabs />;
 
   const skip = () => {
     setOnboarded(true);
-    router.replace('/(tabs)');
+    router.dismissTo('/(tabs)');
   };
 
   return (

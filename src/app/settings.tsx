@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
+import { isAuthRetryableFetchError } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
 import { useRouter } from 'expo-router';
 import { type ComponentProps, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
+import { showAlert, showConfirm } from '@/lib/alert';
 import { saveOrShare } from '@/lib/download';
 import { buildExportZip, isLibraryEmpty } from '@/lib/libraryBackup';
 import { checkForUpdate, type UpdateCheckResult } from '@/lib/updateCheck';
@@ -101,11 +103,14 @@ export default function SettingsScreen() {
 
   const doSignOut = async () => {
     try {
-      await supabase.auth.signOut();
-      // Session is now cleared → send the user back to the login gate.
-      router.replace('/auth');
+      // A network failure resolves with an error and keeps the session.
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      // No navigation here: without a session this screen is no longer available
+      // (see the root layout), so the router returns to the tabs, which open the
+      // login screen. Navigating here as well would open it twice.
     } catch {
-      Alert.alert('Could not sign out', 'Please try again.');
+      showAlert('Could not sign out', 'Please try again.');
       setSigningOut(false);
     }
   };
@@ -119,20 +124,17 @@ export default function SettingsScreen() {
     const synced = await syncNow().catch(() => false);
     if (!synced && hasSupabase()) {
       setSigningOut(false);
-      Alert.alert(
+      showConfirm(
         'Unsynced changes',
         "Some changes couldn't be saved to the cloud and may be lost on this device. Sign out anyway?",
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Sign out',
-            style: 'destructive',
-            onPress: () => {
-              setSigningOut(true);
-              void doSignOut();
-            },
+        {
+          confirmText: 'Sign out',
+          destructive: true,
+          onConfirm: () => {
+            setSigningOut(true);
+            void doSignOut();
           },
-        ],
+        },
       );
       return;
     }
@@ -149,19 +151,25 @@ export default function SettingsScreen() {
     const next = nameInput.trim();
     const err = validateUsername(next);
     if (err) {
-      Alert.alert('Invalid username', err);
+      showAlert('Invalid username', err);
       return;
     }
     setSavingName(true);
     try {
       const { error } = await supabase.auth.updateUser({ data: { username: next } });
       if (error) {
-        Alert.alert('Could not update username', error.message);
+        // A network failure's message is the raw fetch error (e.g. "Failed to fetch").
+        showAlert(
+          'Could not update username',
+          isAuthRetryableFetchError(error)
+            ? 'Please check your connection and try again.'
+            : error.message,
+        );
         return;
       }
       setEditingName(false);
     } catch {
-      Alert.alert('Could not update username', 'Please try again.');
+      showAlert('Could not update username', 'Please try again.');
     } finally {
       setSavingName(false);
     }
@@ -172,7 +180,7 @@ export default function SettingsScreen() {
     const { watchedMovies, trackedShows, watchlist } = useLibraryStore.getState();
     const snapshot = { watchedMovies, trackedShows, watchlist };
     if (isLibraryEmpty(snapshot)) {
-      Alert.alert('Nothing to export yet', 'Add movies or shows to your library first.');
+      showAlert('Nothing to export yet', 'Add movies or shows to your library first.');
       return;
     }
     setExporting(true);
@@ -186,7 +194,7 @@ export default function SettingsScreen() {
         dialogTitle: 'Export your Seen It library',
       });
     } catch {
-      Alert.alert('Could not export', 'Please try again.');
+      showAlert('Could not export', 'Please try again.');
     } finally {
       setExporting(false);
     }
@@ -197,7 +205,7 @@ export default function SettingsScreen() {
   const onCheckUpdate = async () => {
     if (updateResult?.status === 'available') {
       Linking.openURL(updateResult.apkUrl).catch(() =>
-        Alert.alert('Could not open download', 'Please try again.'),
+        showAlert('Could not open download', 'Please try again.'),
       );
       return;
     }
